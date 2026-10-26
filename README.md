@@ -86,7 +86,8 @@ Options:
 | `--node-command <path>` | Command used to start the hooks, for example an absolute path to node (default `node`) |
 | `--no-settings` | Copy files only; do not touch `settings.json` |
 | `--with-third-party` | Also fetch the reviewed third-party skills at pinned commits into `skills/` (needs network and git) |
-| `--include-unreviewed` | With third-party: also fetch the curated reference skills whose review state is `none`. Read them first (`security-kb/core/ai-tooling-security.md`) |
+| `--with-curated` | With third-party: also fetch the optional curated reference skills (30 from mukul975, 4 from Masriyan). Read `THIRD_PARTY.md` first: they contain unpinned install commands and offensive reference material |
+| `--include-unreviewed` | With third-party: also fetch sources whose review state is `none` (currently there are none) |
 | `--with-plugin-files` | With third-party: also fetch the Trail of Bits plugin folders into `plugins-local/`. Activating a plugin is a manual step; confirm the install command for your Claude Code version first |
 | `--verbose` | List every file |
 | `--force` | Replace conflicting files after backing them up |

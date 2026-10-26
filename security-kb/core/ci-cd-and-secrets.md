@@ -17,7 +17,7 @@ A build pipeline can publish to production, so it is a target. Applies to any CI
 6. **Runners.** Shared runners run untrusted code. Use isolated, ephemeral runners for jobs with secrets. Do not run privileged containers or mount the host container socket for ordinary builds.
 7. **Artifacts and logs.** Artifacts expire. Logs never print secrets; masking is a backstop, not a design. Do not upload production configuration or key files as artifacts.
 8. **Registry access.** Pull credentials are read-only for build jobs. Push rights belong to the release job only.
-9. **Signing and provenance.** Sign release artifacts and images, record which commit and pipeline produced them, and verify before deploy.
+9. **Traceability.** Record which commit and pipeline built each deployed artifact (build metadata or image labels), and deploy by an immutable digest or exact version, so you can always say what is running and where it came from.
 10. **Dependency installs.** Locked installs with audit enabled; see `dependency-supply-chain.md`.
 11. **Secret scanning.** Scan every push with a secret scanner (for example gitleaks, whose README documents `gitleaks git` and `gitleaks dir`, `--redact`, and `--exit-code`; `detect` and `protect` are deprecated since v8.19.0). A ready configuration is in `templates/gitleaks.toml` and `templates/gitlab-ci-secret-scan.yml`.
 12. **AI agents in CI.** Never give a pipeline agent write access and untrusted input together. See `ai-tooling-security.md`.

@@ -10,7 +10,7 @@ const scanner = require('./prepublish-scan.cjs')
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sec-tools-'))
 const goodSha = 'a'.repeat(40)
-const source = (over = {}) => ({ id: 's', repo: 'https://github.com/o/r', sha: goodSha, license: 'MIT', review: 'partial', include: [{ from: 'a', to: 'b' }], ...over })
+const source = (over = {}) => ({ id: 's', repo: 'https://github.com/o/r', sha: goodSha, license: 'MIT', review: 'partial', reviewedSha: goodSha, include: [{ from: 'a', to: 'b' }], ...over })
 
 test('safeJoin keeps paths inside the root', () => {
   assert.ok(fetcher.safeJoin(tmp, 'a/b').startsWith(tmp))
@@ -34,10 +34,31 @@ test('validateSource rejects unpinned, foreign, and escaping sources', () => {
   assert.throws(() => fetcher.validateSource(source({ remove: ['../x'] })), /escapes/)
 })
 
+test('a review recorded at another commit than the pin is rejected', () => {
+  assert.throws(() => fetcher.validateSource(source({ reviewedSha: 'b'.repeat(40) })), /re-review before changing the pin/)
+})
+
+test('a reviewed source must record the commit it was reviewed at, an unreviewed one need not', () => {
+  const noSha = source()
+  delete noSha.reviewedSha
+  assert.throws(() => fetcher.validateSource(noSha), /must record reviewedSha/)
+  assert.doesNotThrow(() => fetcher.validateSource({ ...noSha, review: 'none' }))
+})
+
+test('optional sources are skipped unless asked for, independently of the review state', () => {
+  const lock = { sources: [source({ id: 'a' }), source({ id: 'b', optional: true }), source({ id: 'c', optional: true, review: 'none' })] }
+  const ids = (argv) => fetcher.select(lock, fetcher.parseArgs(argv)).map((s) => s.id)
+  assert.deepStrictEqual(ids([]), ['a'])
+  assert.deepStrictEqual(ids(['--include-optional']), ['a', 'b'])
+  assert.deepStrictEqual(ids(['--include-optional', '--include-unreviewed']), ['a', 'b', 'c'])
+})
+
 test('the shipped lock file validates and pins every source', () => {
   const lock = fetcher.loadLock()
   assert.ok(lock.sources.length >= 5)
   for (const s of lock.sources) assert.match(s.sha, /^[0-9a-f]{40}$/)
+  for (const s of lock.sources.filter((x) => x.review !== 'none')) assert.strictEqual(s.reviewedSha, s.sha, s.id)
+  assert.ok(lock.sources.filter((s) => s.optional).every((s) => s.id.endsWith('-curated')))
 })
 
 test('setTools rewrites inline and list tool declarations and keeps the body', () => {

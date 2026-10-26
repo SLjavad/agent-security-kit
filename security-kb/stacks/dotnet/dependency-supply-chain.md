@@ -22,9 +22,9 @@ Companion to `core/dependency-supply-chain.md`. Checked against Microsoft Learn 
 - NU1403 (content hash mismatch) means the package differs from the last restore. Treat it as possible tampering until the source is identified ([NU1403](https://learn.microsoft.com/nuget/reference/errors-and-warnings/nu1403)).
 - Floating versions such as `2.*` are repeatable only with lock files. Pin the SDK with `global.json`, because implicit package versions change with it.
 
-## Review and provenance
+## Review and inventory
 - Check a package's publisher, release history, repository, licence, and transitive count before adding it.
-- Verify signatures and configure `trustedSigners` where policy requires it ([nuget.config reference](https://learn.microsoft.com/nuget/reference/nuget-config-file)). Store no credentials in `nuget.config`; use the CI credential provider.
+- Store no credentials in `nuget.config`; use the CI credential provider ([nuget.config reference](https://learn.microsoft.com/nuget/reference/nuget-config-file)).
 - Produce an SBOM at release.
 
 ## Checklist

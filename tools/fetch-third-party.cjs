@@ -20,6 +20,10 @@ const validateSource = (source) => {
   if (!REPO.test(source.repo)) throw new Error(`${source.id}: repository URL not allowed`)
   if (!SHA.test(source.sha)) throw new Error(`${source.id}: sha must be 40 hex characters`)
   if (!(source.review in REVIEW_RANK)) throw new Error(`${source.id}: review must be none, partial, or full`)
+  if (source.reviewedSha !== undefined && source.reviewedSha !== source.sha) {
+    throw new Error(`${source.id}: the review was done at ${String(source.reviewedSha).slice(0, 12)} but the pin is ${source.sha.slice(0, 12)}; re-review before changing the pin`)
+  }
+  if (source.review !== 'none' && source.reviewedSha === undefined) throw new Error(`${source.id}: a reviewed source must record reviewedSha`)
   const probe = path.join(os.tmpdir(), 'probe')
   for (const inc of source.include || []) {
     safeJoin(probe, inc.from)
@@ -82,12 +86,13 @@ const apply = (source, target, force) => {
 }
 
 const parseArgs = (argv) => {
-  const args = { only: null, target: null, apply: false, force: false, includeUnreviewed: false, list: false }
+  const args = { only: null, target: null, apply: false, force: false, includeUnreviewed: false, includeOptional: false, list: false }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--apply') args.apply = true
     else if (a === '--force') args.force = true
     else if (a === '--include-unreviewed') args.includeUnreviewed = true
+    else if (a === '--include-optional') args.includeOptional = true
     else if (a === '--list') args.list = true
     else if (a === '--only') args.only = String(argv[++i] || '').split(',').filter(Boolean)
     else if (a === '--target') args.target = argv[++i]
@@ -97,13 +102,13 @@ const parseArgs = (argv) => {
 }
 
 const select = (lock, args) =>
-  lock.sources.filter((s) => (!args.only || args.only.includes(s.id)) && (args.includeUnreviewed || REVIEW_RANK[s.review] > 0))
+  lock.sources.filter((s) => (!args.only || args.only.includes(s.id)) && (args.includeUnreviewed || REVIEW_RANK[s.review] > 0) && (args.includeOptional || !s.optional))
 
 const main = () => {
   const args = parseArgs(process.argv.slice(2))
   const lock = loadLock()
   if (args.list) {
-    lock.sources.forEach((s) => console.log(`${s.id}\t${s.license}\treview=${s.review}\t${s.repo}@${s.sha.slice(0, 12)}\t${s.include.length} item(s)`))
+    lock.sources.forEach((s) => console.log(`${s.id}\t${s.license}\treview=${s.review}${s.optional ? ' (optional)' : ''}\t${s.repo}@${s.sha.slice(0, 12)}\t${s.include.length} item(s)`))
     return
   }
   if (!args.target) throw new Error('--target <directory> is required')

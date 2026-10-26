@@ -31,8 +31,7 @@ Applies to any package ecosystem. Items marked (general practice) are not from a
 ## 4. Review what you add
 Before adding a package: who publishes it, last release date, release history, repository link, licence, number of transitive dependencies, install-time scripts or plug-ins, and whether the platform already provides the feature. Check the exact name for typos against the project's own documentation. (general practice)
 
-## 5. Provenance and inventory
-- Verify package signatures or provenance attestations where your ecosystem and policy support them.
+## 5. Inventory
 - Produce a software bill of materials at release so you can answer "are we affected?" quickly when a new advisory appears. (general practice)
 
 ## Checklist

@@ -6,7 +6,23 @@
       "sha": "c1c8a8c1471069fb0e188eeaff69b8e8db6564a8",
       "license": "MIT",
       "review": "partial",
-      "include": [{ "from": "skills/security-audit", "to": "skills/security-audit" }]
+      "include": [
+        {
+          "from": "skills/security-audit",
+          "to": "skills/security-audit"
+        }
+      ],
+      "remove": [
+        "skills/security-audit/validate-coverage-ledger.test.cjs",
+        "skills/security-audit/validate-findings.test.cjs"
+      ],
+      "reviewedSha": "c1c8a8c1471069fb0e188eeaff69b8e8db6564a8",
+      "reviewedAt": "2026-10-26",
+      "reviewScope": "Executables: both validators read for imports, file and process use, and the run path; no network, environment, child-process or write calls. SKILL.md and README read; the 12 companion files were pattern-scanned only.",
+      "reviewNotes": [
+        "Validators are read-only and exit 1 on native Windows because O_NOFOLLOW and O_NONBLOCK are undefined there; use WSL, Linux, or macOS for full audits.",
+        "Test files removed: they only spawn node and mkfifo against the validators."
+      ]
     },
     {
       "id": "agamm-owasp",
@@ -14,7 +30,18 @@
       "sha": "8ac7965caa212b4a850aff8d3df0081ab3fa9eed",
       "license": "MIT",
       "review": "partial",
-      "include": [{ "from": ".claude/skills/owasp-security", "to": "skills/owasp-security" }]
+      "include": [
+        {
+          "from": ".claude/skills/owasp-security",
+          "to": "skills/owasp-security"
+        }
+      ],
+      "reviewedSha": "8ac7965caa212b4a850aff8d3df0081ab3fa9eed",
+      "reviewedAt": "2026-10-26",
+      "reviewScope": "All 5 files pattern-scanned (no hidden Unicode, injection phrases, or executables); SKILL.md front matter and layout read.",
+      "reviewNotes": [
+        "No executable files."
+      ]
     },
     {
       "id": "trailofbits-skills",
@@ -23,17 +50,66 @@
       "license": "CC-BY-SA-4.0",
       "review": "partial",
       "include": [
-        { "from": "plugins/differential-review", "to": "plugins-local/differential-review" },
-        { "from": "plugins/insecure-defaults", "to": "plugins-local/insecure-defaults" },
-        { "from": "plugins/sharp-edges", "to": "plugins-local/sharp-edges" },
-        { "from": "plugins/audit-context-building", "to": "plugins-local/audit-context-building" },
-        { "from": "plugins/variant-analysis", "to": "plugins-local/variant-analysis" },
-        { "from": "plugins/fp-check", "to": "plugins-local/fp-check" }
+        {
+          "from": "plugins/differential-review",
+          "to": "plugins-local/differential-review"
+        },
+        {
+          "from": "plugins/insecure-defaults",
+          "to": "plugins-local/insecure-defaults"
+        },
+        {
+          "from": "plugins/sharp-edges",
+          "to": "plugins-local/sharp-edges"
+        },
+        {
+          "from": "plugins/audit-context-building",
+          "to": "plugins-local/audit-context-building"
+        },
+        {
+          "from": "plugins/variant-analysis",
+          "to": "plugins-local/variant-analysis"
+        },
+        {
+          "from": "plugins/fp-check",
+          "to": "plugins-local/fp-check"
+        }
       ],
-      "remove": ["plugins-local/fp-check/hooks"],
+      "remove": [
+        "plugins-local/fp-check/hooks",
+        "plugins-local/audit-context-building/evals",
+        "plugins-local/insecure-defaults/tests",
+        "plugins-local/variant-analysis/evals",
+        "plugins-local/variant-analysis/tests"
+      ],
       "setTools": [
-        { "file": "plugins-local/differential-review/agents/adversarial-modeler.md", "tools": ["Read", "Grep", "Glob"] },
-        { "file": "plugins-local/fp-check/agents/poc-builder.md", "tools": ["Read", "Grep", "Glob"] }
+        {
+          "file": "plugins-local/differential-review/agents/adversarial-modeler.md",
+          "tools": [
+            "Read",
+            "Grep",
+            "Glob"
+          ]
+        },
+        {
+          "file": "plugins-local/fp-check/agents/poc-builder.md",
+          "tools": [
+            "Read",
+            "Grep",
+            "Glob"
+          ]
+        }
+      ],
+      "reviewedSha": "196a9073ab10d35bacf111f945e02c00b2c6883a",
+      "reviewedAt": "2026-10-26",
+      "reviewScope": "Executables: the three workflow scripts (variants.js, audit-context.js, audit.js), all shell scripts, Python tests, agent and command files read or pattern-scanned; instruction files pattern-scanned plus the main skill files read.",
+      "reviewNotes": [
+        "Workflows only orchestrate agents; no network or secret access of their own.",
+        "variants.js lists directory names under HOME as a fallback to find its references.",
+        "audit-context.js writes to audit-context/ in the working directory unless outDir is set; pass an outDir outside the repository.",
+        "insecure-defaults quotes matching lines, which can include literal secrets, into model context and its report; run it where that is acceptable.",
+        "differential-review and fp-check skills declare Write and Bash (fp-check also Edit) in allowed-tools; the agent trims do not change that.",
+        "variant-analysis tests/eval.sh runs claude with bypassPermissions; tests and evals removed from the install."
       ]
     },
     {
@@ -41,58 +117,181 @@
       "repo": "https://github.com/mukul975/Anthropic-Cybersecurity-Skills",
       "sha": "54a798831d2266a3ca61ce68a7acb80b81160d57",
       "license": "Apache-2.0",
-      "review": "none",
+      "review": "partial",
       "include": [
-        { "from": "skills/building-devsecops-pipeline-with-gitlab-ci", "to": "security-kb/curated/building-devsecops-pipeline-with-gitlab-ci" },
-        { "from": "skills/implementing-secret-scanning-with-gitleaks", "to": "security-kb/curated/implementing-secret-scanning-with-gitleaks" },
-        { "from": "skills/implementing-semgrep-for-custom-sast-rules", "to": "security-kb/curated/implementing-semgrep-for-custom-sast-rules" },
-        { "from": "skills/implementing-infrastructure-as-code-security-scanning", "to": "security-kb/curated/implementing-infrastructure-as-code-security-scanning" },
-        { "from": "skills/implementing-policy-as-code-with-open-policy-agent", "to": "security-kb/curated/implementing-policy-as-code-with-open-policy-agent" },
-        { "from": "skills/integrating-dast-with-owasp-zap-in-pipeline", "to": "security-kb/curated/integrating-dast-with-owasp-zap-in-pipeline" },
-        { "from": "skills/performing-container-image-hardening", "to": "security-kb/curated/performing-container-image-hardening" },
-        { "from": "skills/implementing-code-signing-for-artifacts", "to": "security-kb/curated/implementing-code-signing-for-artifacts" },
-        { "from": "skills/implementing-api-key-security-controls", "to": "security-kb/curated/implementing-api-key-security-controls" },
-        { "from": "skills/implementing-api-rate-limiting-and-throttling", "to": "security-kb/curated/implementing-api-rate-limiting-and-throttling" },
-        { "from": "skills/implementing-api-schema-validation-security", "to": "security-kb/curated/implementing-api-schema-validation-security" },
-        { "from": "skills/detecting-broken-object-property-level-authorization", "to": "security-kb/curated/detecting-broken-object-property-level-authorization" },
-        { "from": "skills/configuring-tls-1-3-for-secure-communications", "to": "security-kb/curated/configuring-tls-1-3-for-secure-communications" },
-        { "from": "skills/implementing-aes-encryption-for-data-at-rest", "to": "security-kb/curated/implementing-aes-encryption-for-data-at-rest" },
-        { "from": "skills/implementing-envelope-encryption-with-aws-kms", "to": "security-kb/curated/implementing-envelope-encryption-with-aws-kms" },
-        { "from": "skills/implementing-digital-signatures-with-ed25519", "to": "security-kb/curated/implementing-digital-signatures-with-ed25519" },
-        { "from": "skills/performing-cryptographic-audit-of-application", "to": "security-kb/curated/performing-cryptographic-audit-of-application" },
-        { "from": "skills/migrating-to-post-quantum-cryptography", "to": "security-kb/curated/migrating-to-post-quantum-cryptography" },
-        { "from": "skills/implementing-jwt-signing-and-verification", "to": "security-kb/curated/implementing-jwt-signing-and-verification" },
-        { "from": "skills/generating-and-analyzing-sboms", "to": "security-kb/curated/generating-and-analyzing-sboms" },
-        { "from": "skills/detecting-dependency-confusion", "to": "security-kb/curated/detecting-dependency-confusion" },
-        { "from": "skills/detecting-typosquatting-packages", "to": "security-kb/curated/detecting-typosquatting-packages" },
-        { "from": "skills/implementing-sigstore-for-software-signing", "to": "security-kb/curated/implementing-sigstore-for-software-signing" },
-        { "from": "skills/verifying-build-provenance-with-slsa-sigstore", "to": "security-kb/curated/verifying-build-provenance-with-slsa-sigstore" },
-        { "from": "skills/analyzing-sbom-for-supply-chain-vulnerabilities", "to": "security-kb/curated/analyzing-sbom-for-supply-chain-vulnerabilities" },
-        { "from": "skills/hardening-docker-containers-for-production", "to": "security-kb/curated/hardening-docker-containers-for-production" },
-        { "from": "skills/implementing-container-image-minimal-base-with-distroless", "to": "security-kb/curated/implementing-container-image-minimal-base-with-distroless" },
-        { "from": "skills/implementing-image-provenance-verification-with-cosign", "to": "security-kb/curated/implementing-image-provenance-verification-with-cosign" },
-        { "from": "skills/auditing-mcp-servers-for-tool-poisoning", "to": "security-kb/curated/auditing-mcp-servers-for-tool-poisoning" },
-        { "from": "skills/securing-agentic-ai-tool-invocation", "to": "security-kb/curated/securing-agentic-ai-tool-invocation" },
-        { "from": "skills/detecting-indirect-prompt-injection", "to": "security-kb/curated/detecting-indirect-prompt-injection" },
-        { "from": "skills/defending-llms-with-guardrails", "to": "security-kb/curated/defending-llms-with-guardrails" },
-        { "from": "skills/performing-privacy-impact-assessment", "to": "security-kb/curated/performing-privacy-impact-assessment" },
-        { "from": "skills/implementing-gdpr-data-subject-access-request", "to": "security-kb/curated/implementing-gdpr-data-subject-access-request" }
+        {
+          "from": "skills/building-devsecops-pipeline-with-gitlab-ci",
+          "to": "security-kb/curated/building-devsecops-pipeline-with-gitlab-ci"
+        },
+        {
+          "from": "skills/implementing-secret-scanning-with-gitleaks",
+          "to": "security-kb/curated/implementing-secret-scanning-with-gitleaks"
+        },
+        {
+          "from": "skills/implementing-semgrep-for-custom-sast-rules",
+          "to": "security-kb/curated/implementing-semgrep-for-custom-sast-rules"
+        },
+        {
+          "from": "skills/implementing-infrastructure-as-code-security-scanning",
+          "to": "security-kb/curated/implementing-infrastructure-as-code-security-scanning"
+        },
+        {
+          "from": "skills/implementing-policy-as-code-with-open-policy-agent",
+          "to": "security-kb/curated/implementing-policy-as-code-with-open-policy-agent"
+        },
+        {
+          "from": "skills/integrating-dast-with-owasp-zap-in-pipeline",
+          "to": "security-kb/curated/integrating-dast-with-owasp-zap-in-pipeline"
+        },
+        {
+          "from": "skills/performing-container-image-hardening",
+          "to": "security-kb/curated/performing-container-image-hardening"
+        },
+        {
+          "from": "skills/implementing-api-key-security-controls",
+          "to": "security-kb/curated/implementing-api-key-security-controls"
+        },
+        {
+          "from": "skills/implementing-api-rate-limiting-and-throttling",
+          "to": "security-kb/curated/implementing-api-rate-limiting-and-throttling"
+        },
+        {
+          "from": "skills/implementing-api-schema-validation-security",
+          "to": "security-kb/curated/implementing-api-schema-validation-security"
+        },
+        {
+          "from": "skills/detecting-broken-object-property-level-authorization",
+          "to": "security-kb/curated/detecting-broken-object-property-level-authorization"
+        },
+        {
+          "from": "skills/configuring-tls-1-3-for-secure-communications",
+          "to": "security-kb/curated/configuring-tls-1-3-for-secure-communications"
+        },
+        {
+          "from": "skills/implementing-aes-encryption-for-data-at-rest",
+          "to": "security-kb/curated/implementing-aes-encryption-for-data-at-rest"
+        },
+        {
+          "from": "skills/implementing-envelope-encryption-with-aws-kms",
+          "to": "security-kb/curated/implementing-envelope-encryption-with-aws-kms"
+        },
+        {
+          "from": "skills/implementing-digital-signatures-with-ed25519",
+          "to": "security-kb/curated/implementing-digital-signatures-with-ed25519"
+        },
+        {
+          "from": "skills/performing-cryptographic-audit-of-application",
+          "to": "security-kb/curated/performing-cryptographic-audit-of-application"
+        },
+        {
+          "from": "skills/migrating-to-post-quantum-cryptography",
+          "to": "security-kb/curated/migrating-to-post-quantum-cryptography"
+        },
+        {
+          "from": "skills/implementing-jwt-signing-and-verification",
+          "to": "security-kb/curated/implementing-jwt-signing-and-verification"
+        },
+        {
+          "from": "skills/generating-and-analyzing-sboms",
+          "to": "security-kb/curated/generating-and-analyzing-sboms"
+        },
+        {
+          "from": "skills/detecting-dependency-confusion",
+          "to": "security-kb/curated/detecting-dependency-confusion"
+        },
+        {
+          "from": "skills/detecting-typosquatting-packages",
+          "to": "security-kb/curated/detecting-typosquatting-packages"
+        },
+        {
+          "from": "skills/analyzing-sbom-for-supply-chain-vulnerabilities",
+          "to": "security-kb/curated/analyzing-sbom-for-supply-chain-vulnerabilities"
+        },
+        {
+          "from": "skills/hardening-docker-containers-for-production",
+          "to": "security-kb/curated/hardening-docker-containers-for-production"
+        },
+        {
+          "from": "skills/implementing-container-image-minimal-base-with-distroless",
+          "to": "security-kb/curated/implementing-container-image-minimal-base-with-distroless"
+        },
+        {
+          "from": "skills/auditing-mcp-servers-for-tool-poisoning",
+          "to": "security-kb/curated/auditing-mcp-servers-for-tool-poisoning"
+        },
+        {
+          "from": "skills/securing-agentic-ai-tool-invocation",
+          "to": "security-kb/curated/securing-agentic-ai-tool-invocation"
+        },
+        {
+          "from": "skills/detecting-indirect-prompt-injection",
+          "to": "security-kb/curated/detecting-indirect-prompt-injection"
+        },
+        {
+          "from": "skills/defending-llms-with-guardrails",
+          "to": "security-kb/curated/defending-llms-with-guardrails"
+        },
+        {
+          "from": "skills/performing-privacy-impact-assessment",
+          "to": "security-kb/curated/performing-privacy-impact-assessment"
+        },
+        {
+          "from": "skills/implementing-gdpr-data-subject-access-request",
+          "to": "security-kb/curated/implementing-gdpr-data-subject-access-request"
+        }
       ],
-      "removeEach": ["scripts"]
+      "removeEach": [
+        "scripts"
+      ],
+      "optional": true,
+      "reviewedSha": "54a798831d2266a3ca61ce68a7acb80b81160d57",
+      "reviewedAt": "2026-10-26",
+      "reviewScope": "All 160 files pattern-scanned; all 34 SKILL.md files summarised (description, sections, instruction lines); 2 read in full; licences verified identical Apache-2.0.",
+      "reviewNotes": [
+        "No hidden Unicode instructions, exfiltration URLs, or active content found.",
+        "Six curl-pipe-to-shell install lines in four skills; the kit shell guard blocks these in enforce mode. Use the vendor verified install instead.",
+        "Many install commands are unpinned (20 @latest, 33 pip install, 13 uvx, 8 go install @).",
+        "scripts/ is removed on install, so about 19 skills mention files that are not present.",
+        "Six crypto skills are short generic outlines (3 to 4 KB).",
+        "Four artifact-signing and provenance skills (code signing, Sigstore, SLSA verification, cosign image verification) were dropped because signing is out of scope for this kit."
+      ]
     },
     {
       "id": "masriyan-curated",
       "repo": "https://github.com/Masriyan/Claude-Code-CyberSecurity-Skill",
       "sha": "3aa77d84fb64cf07b550f6be4544bb91292db89f",
       "license": "MIT",
-      "review": "none",
+      "review": "partial",
       "include": [
-        { "from": "skills/09-web-security", "to": "security-kb/curated/masriyan-09-web-security" },
-        { "from": "skills/13-crypto-analysis", "to": "security-kb/curated/masriyan-13-crypto-analysis" },
-        { "from": "skills/19-grc-compliance", "to": "security-kb/curated/masriyan-19-grc-compliance" },
-        { "from": "skills/20-supply-chain-security", "to": "security-kb/curated/masriyan-20-supply-chain-security" }
+        {
+          "from": "skills/09-web-security",
+          "to": "security-kb/curated/masriyan-09-web-security"
+        },
+        {
+          "from": "skills/13-crypto-analysis",
+          "to": "security-kb/curated/masriyan-13-crypto-analysis"
+        },
+        {
+          "from": "skills/19-grc-compliance",
+          "to": "security-kb/curated/masriyan-19-grc-compliance"
+        },
+        {
+          "from": "skills/20-supply-chain-security",
+          "to": "security-kb/curated/masriyan-20-supply-chain-security"
+        }
       ],
-      "removeEach": ["scripts"]
+      "removeEach": [
+        "scripts"
+      ],
+      "optional": true,
+      "reviewedSha": "3aa77d84fb64cf07b550f6be4544bb91292db89f",
+      "reviewedAt": "2026-10-26",
+      "reviewScope": "All 8 files pattern-scanned; all 4 SKILL.md files summarised; 09-web-security read in full.",
+      "reviewNotes": [
+        "No findings from the pattern scan.",
+        "09-web-security contains offensive payload libraries (SQL injection, XSS, template injection, command injection, SSRF, JWT attacks) under authorization notices; treat as tier 3 reference only.",
+        "scripts/ is removed on install, so Script Reference sections point to missing files."
+      ]
     }
   ]
 }

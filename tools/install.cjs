@@ -105,9 +105,9 @@ const filterThirdParty = (source, withPlugins) => {
   return { ...source, include, remove: (source.remove || []).filter(keep), setTools: (source.setTools || []).filter((t) => keep(t.file)) }
 }
 
-const planThirdParty = (claudeDir, { includeUnreviewed, withPlugins }) => {
+const planThirdParty = (claudeDir, { includeUnreviewed, withPlugins, withCurated }) => {
   const lock = thirdParty.loadLock()
-  const chosen = thirdParty.select(lock, { only: null, includeUnreviewed }).map((s) => filterThirdParty(s, withPlugins)).filter(Boolean)
+  const chosen = thirdParty.select(lock, { only: null, includeUnreviewed, includeOptional: withCurated }).map((s) => filterThirdParty(s, withPlugins)).filter(Boolean)
   return chosen.map((s) => ({
     source: s,
     items: s.include.map((i) => ({ to: i.to, exists: exists(thirdParty.safeJoin(claudeDir, i.to)) }))
@@ -177,7 +177,7 @@ const kitVersion = () => {
 }
 
 const parseArgs = (argv) => {
-  const args = { claudeDir: path.join(os.homedir(), '.claude'), dryRun: false, uninstall: false, withThirdParty: false, withPlugins: false, includeUnreviewed: false, hooksMode: 'warn', nodeCommand: null, force: false, settings: true, smoke: true, verbose: false }
+  const args = { claudeDir: path.join(os.homedir(), '.claude'), dryRun: false, uninstall: false, withThirdParty: false, withPlugins: false, includeUnreviewed: false, withCurated: false, hooksMode: 'warn', nodeCommand: null, force: false, settings: true, smoke: true, verbose: false }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--dry-run') args.dryRun = true
@@ -186,6 +186,7 @@ const parseArgs = (argv) => {
     else if (a === '--with-third-party') args.withThirdParty = true
     else if (a === '--with-plugin-files') args.withPlugins = true
     else if (a === '--include-unreviewed') args.includeUnreviewed = true
+    else if (a === '--with-curated') args.withCurated = true
     else if (a === '--force') args.force = true
     else if (a === '--no-settings') args.settings = false
     else if (a === '--no-smoke-test') args.smoke = false
@@ -197,7 +198,7 @@ const parseArgs = (argv) => {
   }
   if (!['warn', 'enforce'].includes(args.hooksMode)) throw new Error('--hooks-mode must be warn or enforce')
   if (!args.claudeDir) throw new Error('--claude-dir needs a value')
-  if ((args.withPlugins || args.includeUnreviewed) && !args.withThirdParty) throw new Error('--with-plugin-files and --include-unreviewed need --with-third-party')
+  if ((args.withPlugins || args.includeUnreviewed || args.withCurated) && !args.withThirdParty) throw new Error('--with-plugin-files, --with-curated and --include-unreviewed need --with-third-party')
   args.claudeDir = path.resolve(args.claudeDir)
   args.apply = !args.dryRun
   return args
@@ -238,6 +239,7 @@ const install = (args) => {
     log('Third-party sources (fetched at pinned commits; needs network and git):')
     for (const t of third) for (const i of t.items) log(`  ${t.source.id}: ${i.to}${i.exists ? '  (already exists)' : ''}`)
     if (!args.withPlugins) log('  plugin files skipped (add --with-plugin-files to fetch them; activating a plugin is a manual step)')
+    if (!args.withCurated) log('  curated reference skills skipped (add --with-curated to fetch them)')
   } else log('Third-party: skipped (add --with-third-party)')
   const conflicts = files.filter((f) => f.action === 'conflict')
   const thirdConflicts = third.flatMap((t) => t.items.filter((i) => i.exists && !args.force).map((i) => i.to))

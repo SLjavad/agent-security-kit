@@ -162,6 +162,7 @@ test('invalid input aborts before any write', () => {
   assert.strictEqual(install(sharedKit, claude, '--bogus').code, 1)
   assert.strictEqual(install(sharedKit, claude, '--hooks-mode', 'loud').code, 1)
   assert.strictEqual(install(sharedKit, claude, '--with-plugin-files').code, 1)
+  assert.strictEqual(install(sharedKit, claude, '--with-curated').code, 1)
 })
 
 test('a failure while copying rolls everything back', () => {
@@ -230,9 +231,10 @@ test('third-party dry run lists the plan from the lock file without network or w
   assert.match(r.out, /cloudflare-security-audit: skills\/security-audit/)
   assert.match(r.out, /agamm-owasp: skills\/owasp-security/)
   assert.match(r.out, /plugin files skipped/)
+  assert.match(r.out, /curated reference skills skipped/)
   assert.ok(!/mukul975-curated/.test(r.out))
   assert.ok(!/plugins-local/.test(r.out.replace(/plugin files skipped[^\n]*/, '')))
-  const withAll = install(sharedKit, claude, '--with-third-party', '--with-plugin-files', '--include-unreviewed', '--dry-run')
+  const withAll = install(sharedKit, claude, '--with-third-party', '--with-plugin-files', '--with-curated', '--dry-run')
   assert.match(withAll.out, /trailofbits-skills: plugins-local\/fp-check/)
   assert.match(withAll.out, /mukul975-curated: security-kb\/curated\//)
   assert.deepStrictEqual(snapshot(claude), before)
