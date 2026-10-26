@@ -124,7 +124,7 @@ const main = () => {
   fs.writeFileSync(path.join(path.resolve(args.target), '.third-party-manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
 }
 
-module.exports = { safeJoin, validateSource, loadLock, setTools, parseArgs, select, REVIEW_RANK }
+module.exports = { safeJoin, validateSource, loadLock, setTools, parseArgs, select, apply, REVIEW_RANK }
 
 if (require.main === module) {
   try {

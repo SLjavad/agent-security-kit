@@ -2,7 +2,7 @@
 
 A generic, project-independent and framework-independent security kit: a router skill, a read-only reviewer agent, a reference library, deterministic hooks, templates, and tools that fetch well-known third-party security skills at pinned commits. It contains no facts about any particular project or organisation. Project specifics go in a private `.claude/security-context.md` per project (template included).
 
-Status: early release. Built for Claude Code skills, agents, and hooks; the reference library is plain Markdown that any agent or person can read. Only the `dotnet` stack is written so far, and the kit has not yet been tested against live Claude Code sessions beyond the included unit tests. Installation is manual and dry-run first (see below); nothing is installed automatically.
+Status: early release. Built for Claude Code skills, agents, and hooks; the reference library is plain Markdown that any agent or person can read. Only the `dotnet` stack is written so far, and the kit has not yet been tested against live Claude Code sessions beyond the included unit tests. Installation is one command with a `--dry-run` preview, conflict checks, backups, and an uninstaller (see below).
 
 ## What is inside
 
@@ -15,6 +15,7 @@ Status: early release. Built for Claude Code skills, agents, and hooks; the refe
 | `security-kb/templates/` | Framework-neutral templates: project context, secret scanning configuration, CI secret-scan job |
 | `hooks/security/` | Zero-dependency Node hooks: shell guard, secret scan before writes, post-edit scan; core rules plus any `stacks/*/hook-rules.json`; tests included |
 | `settings.patch.json` | Hook entries and `SECURITY_HOOKS_MODE=warn`, merged additively by `tools/merge-settings.cjs` |
+| `tools/install.cjs` | Installer and uninstaller: `--dry-run` preview, conflict-safe, rollback on failure, manifest, smoke test |
 | `tools/fetch-third-party.cjs` | Fetches third-party skills at pinned SHAs and applies recorded trims |
 | `tools/merge-settings.cjs` | Dry-run-first merge and removal of the hook entries, with backup |
 | `tools/prepublish-scan.cjs` | Scans this folder for secrets, personal paths, emails, internal hosts, and your own terms |
@@ -46,25 +47,67 @@ Hooks start in warn mode: they log the rule name and file name to `~/.claude/hoo
 
 Not included yet: a gitleaks call inside the post-edit hook. gitleaks documents `gitleaks dir <path>` and `--redact`; add and test it after you install the tool.
 
-## Installing (needs your approval at each step; nothing here has been run)
+## Installing
 
-1. Fetch third-party skills into a build folder, not into this repository:
-   ```bash
-   node tools/fetch-third-party.cjs --target dist            # dry run
-   node tools/fetch-third-party.cjs --target dist --apply
-   ```
-   Sources whose review state is `none` are skipped unless you add `--include-unreviewed`. Read each one first using the procedure in `security-kb/core/ai-tooling-security.md`.
-2. Copy into `~/.claude`: `skills/security`, `dist/skills/*`, `agents/security-reviewer.md`, `security-kb` (plus `dist/security-kb/curated` if you fetched it), and `hooks/security`.
-3. Merge the hooks, dry run first. The kit directory is the folder that contains `hooks/security`:
-   ```bash
-   node tools/merge-settings.cjs --settings ~/.claude/settings.json --kit-dir ~/.claude
-   node tools/merge-settings.cjs --settings ~/.claude/settings.json --kit-dir ~/.claude --apply
-   ```
-   If the exec-form `node` command does not start on your machine, put the absolute path of `node` in the patch.
-4. Optional Trail of Bits plugins (`dist/plugins-local/*`): confirm the local plugin install mechanism for your Claude Code version first; the plugin READMEs suggest `/plugin install <path>`.
-5. Restart sessions. Review `findings.jsonl` for a few days before choosing `enforce`.
+The installer is `tools/install.cjs`. It needs Node 18 or newer and git (only for third-party fetching). Running it installs the kit. Add **`--dry-run`** to preview first: it prints every file it would create, update, or leave alone, the settings entries it would add, and any conflicts, and it changes nothing.
 
-Uninstall: `node tools/merge-settings.cjs --settings ~/.claude/settings.json --remove --apply`, then delete the copied folders. Backups are written next to `settings.json` as `.bak-<timestamp>`.
+Preview:
+
+```bash
+node tools/install.cjs --dry-run
+```
+
+Install:
+
+```bash
+node tools/install.cjs
+```
+
+What a real install does:
+
+- Copies the router skill, reviewer agent, `security-kb/`, and the hooks (without tests or logs) into `~/.claude`.
+- Merges the hook entries and `SECURITY_HOOKS_MODE` into `~/.claude/settings.json`, keeping everything already there and writing a `settings.json.bak-<time>` backup first.
+- Records every installed file with its hash in `~/.claude/.agent-security-kit-manifest.json`.
+- Runs a smoke test against the installed hooks and reports each check.
+
+Safety rules:
+
+- A file that already exists and was not installed by this kit, or that you edited after installing, is a **conflict**. Nothing at all is written until you resolve it or pass `--force`, which backs the file up to `~/.claude/.agent-security-kit-backup-<time>/` first.
+- Everything is checked before the first write. If copying fails part way, the files written so far are rolled back.
+- Running it again is safe: unchanged files are skipped, unmodified files are updated, and files removed from the kit are removed.
+
+Options:
+
+| Option | Meaning |
+|---|---|
+| `--dry-run` | Preview only: list what would happen and change nothing |
+| `--claude-dir <dir>` | Install somewhere other than `~/.claude` (useful for trying it out) |
+| `--hooks-mode warn|enforce` | Hook mode written to settings (default `warn`) |
+| `--node-command <path>` | Command used to start the hooks, for example an absolute path to node (default `node`) |
+| `--no-settings` | Copy files only; do not touch `settings.json` |
+| `--with-third-party` | Also fetch the reviewed third-party skills at pinned commits into `skills/` (needs network and git) |
+| `--include-unreviewed` | With third-party: also fetch the curated reference skills whose review state is `none`. Read them first (`security-kb/core/ai-tooling-security.md`) |
+| `--with-plugin-files` | With third-party: also fetch the Trail of Bits plugin folders into `plugins-local/`. Activating a plugin is a manual step; confirm the install command for your Claude Code version first |
+| `--verbose` | List every file |
+| `--force` | Replace conflicting files after backing them up |
+| `--no-smoke-test` | Skip the post-install checks |
+
+Exit codes: 0 success, 1 error or failed smoke test, 2 conflicts (nothing changed).
+
+After installing, restart Claude Code sessions. Review `~/.claude/hooks/security/logs/findings.jsonl` for a few days before choosing `enforce`.
+
+### Uninstalling
+
+```bash
+node tools/install.cjs --uninstall --dry-run   # preview
+node tools/install.cjs --uninstall             # remove
+```
+
+Removes only files whose content still matches the manifest (files you edited are kept unless you add `--force`), removes the kit's settings entries, and copies everything it removes to a backup folder first.
+
+### Lower-level tools
+
+`tools/fetch-third-party.cjs` and `tools/merge-settings.cjs` can be run on their own; the installer uses both.
 
 ## Before publishing this folder
 
