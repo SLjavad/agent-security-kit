@@ -1,0 +1,10 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "example and template files"
+paths = [
+  '''\.example(\.|$)''',
+  '''\.sample(\.|$)''',
+  '''\.template(\.|$)'''
+]

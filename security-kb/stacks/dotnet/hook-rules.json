@@ -1,0 +1,21 @@
+{
+  "configDrift": [
+    { "id": "nuget-audit-disabled", "files": "\\.(?:csproj|props|targets)$", "regex": "<NuGetAudit>\\s*false\\s*</NuGetAudit>", "flags": "i" },
+    {
+      "id": "nuget-multiple-sources-without-mapping",
+      "files": "(?:^|[\\\\/])nuget\\.config$",
+      "extract": "<packageSources>([\\s\\S]*?)</packageSources>",
+      "extractFlags": "i",
+      "count": "<add\\s[^>]*key=",
+      "countFlags": "i",
+      "min": 2,
+      "absent": "<packageSourceMapping[\\s>]",
+      "absentFlags": "i"
+    },
+    { "id": "cors-any-origin", "files": "\\.cs$", "regex": "\\.AllowAnyOrigin\\s*\\(" },
+    { "id": "binaryformatter-use", "files": "\\.cs$", "regex": "\\bBinaryFormatter\\b" },
+    { "id": "raw-sql-interpolation", "files": "\\.cs$", "regex": "\\b(?:FromSqlRaw|ExecuteSqlRaw)\\s*\\(\\s*(?:\\$@?\"|@?\"[^\"]*\"\\s*\\+)" },
+    { "id": "weak-crypto-algorithm", "files": "\\.cs$", "regex": "\\b(?:MD5|SHA1)\\.Create\\s*\\(|\\bnew\\s+(?:MD5|SHA1)(?:CryptoServiceProvider|Managed)\\b|\\bTripleDES\\.Create\\s*\\(" },
+    { "id": "certificate-validation-disabled", "files": "\\.cs$", "regex": "DangerousAcceptAnyServerCertificateValidator|ServerCertificateCustomValidationCallback\\s*=\\s*\\([^)]*\\)\\s*=>\\s*true" }
+  ]
+}

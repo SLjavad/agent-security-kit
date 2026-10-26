@@ -1,0 +1,83 @@
+{
+  "excludePaths": [
+    "\\.example(\\.|$)",
+    "\\.sample(\\.|$)",
+    "\\.template(\\.|$)",
+    "hooks[\\\\/]security[\\\\/]patterns\\.json$"
+  ],
+  "secrets": [
+    {
+      "id": "private-key",
+      "regex": "-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY(?: BLOCK)?-----"
+    },
+    {
+      "id": "aws-access-key",
+      "regex": "\\bAKIA[0-9A-Z]{16}\\b"
+    },
+    {
+      "id": "github-token",
+      "regex": "\\bgh[pousr]_[A-Za-z0-9]{36,}\\b"
+    },
+    {
+      "id": "gitlab-token",
+      "regex": "\\bglpat-[A-Za-z0-9_-]{20,}\\b"
+    },
+    {
+      "id": "slack-token",
+      "regex": "\\bxox[abprs]-[A-Za-z0-9-]{10,}\\b"
+    },
+    {
+      "id": "connection-string-password",
+      "regex": "(?:Password|Pwd)\\s*=\\s*(?![{$%<*;\\s\"'])[^;\"'\\s]{4,}",
+      "flags": "i"
+    },
+    {
+      "id": "generic-secret-assignment",
+      "regex": "(?:api[_-]?key|secret|token|passwd|password)\\s*[:=]\\s*[\"'][A-Za-z0-9/+_=.-]{24,}[\"']",
+      "flags": "i"
+    }
+  ],
+  "bash": [
+    {
+      "id": "pipe-to-shell",
+      "regex": "\\b(?:curl|wget)\\b[^|\\n]*\\|\\s*(?:sudo\\s+)?(?:ba|z|da)?sh\\b"
+    },
+    {
+      "id": "pipe-to-iex",
+      "regex": "\\b(?:iwr|irm|Invoke-WebRequest|Invoke-RestMethod)\\b[^|\\n]*\\|\\s*(?:iex|Invoke-Expression)\\b",
+      "flags": "i"
+    },
+    {
+      "id": "iex-download",
+      "regex": "\\b(?:iex|Invoke-Expression)\\s*\\(?\\s*\\(?\\s*(?:iwr|irm|Invoke-WebRequest|Invoke-RestMethod|New-Object\\s+Net\\.WebClient)",
+      "flags": "i"
+    },
+    {
+      "id": "encoded-command",
+      "regex": "\\bpowershell(?:\\.exe)?\\b[^\\n]*\\s-(?:e|enc|encodedcommand)\\s+[A-Za-z0-9+/=]{20,}",
+      "flags": "i"
+    },
+    {
+      "id": "credential-store-read",
+      "regex": "\\b(?:cat|type|Get-Content|gc|more|less|head|tail|cp|copy|xcopy|scp|Copy-Item|Select-String|sls|grep|rg|findstr)\\b[^\\n|;&]*(?:\\.ssh[\\\\/]|id_rsa|id_ecdsa|id_ed25519|\\.aws[\\\\/]credentials|\\.azure[\\\\/]|\\.kube[\\\\/]config|\\.git-credentials|\\.netrc|\\.npmrc|\\.docker[\\\\/]config\\.json|\\.credentials\\.json|UserSecrets|\\.(?:pfx|p12|pem|key|snk|jks|keystore)\\b|(?:^|[\\s\\\\/\"'])\\.env(?!\\.(?:example|sample|template)\\b)(?:\\.[\\w-]+)?(?=[\\s\"']|$))",
+      "flags": "i"
+    },
+    {
+      "id": "tls-verification-off",
+      "regex": "\\bcurl\\b[^\\n]*\\s(?:-k|--insecure)\\b|-SkipCertificateCheck\\b"
+    },
+    {
+      "id": "host-security-weakened",
+      "regex": "\\bSet-MpPreference\\b|\\bAdd-MpPreference\\s+-Exclusion|\\bnetsh\\s+advfirewall\\s+set\\s+\\w+\\s+state\\s+off\\b|\\bufw\\s+disable\\b",
+      "flags": "i"
+    }
+  ],
+  "configDrift": [
+    {
+      "id": "trusted-connection-with-credentials",
+      "files": ".*",
+      "regex": "(?=[^\\n]*Trusted_Connection\\s*=\\s*(?:true|yes|sspi))(?=[^\\n]*(?:User\\s*Id|UID)\\s*=)[^\\n]*",
+      "flags": "i"
+    }
+  ]
+}

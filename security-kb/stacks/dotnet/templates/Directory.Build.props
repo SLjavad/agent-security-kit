@@ -1,0 +1,21 @@
+<Project>
+
+  <PropertyGroup>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+    <AnalysisModeSecurity>All</AnalysisModeSecurity>
+    <CheckSdkVulnerabilities>true</CheckSdkVulnerabilities>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(CI)' == 'true'">
+    <WarningsAsErrors>$(WarningsAsErrors);NU1903;NU1904</WarningsAsErrors>
+    <RestoreLockedMode>true</RestoreLockedMode>
+  </PropertyGroup>
+
+  <!-- Lock files belong to applications and executables only; remove this group for libraries you publish. -->
+  <PropertyGroup>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+
+</Project>

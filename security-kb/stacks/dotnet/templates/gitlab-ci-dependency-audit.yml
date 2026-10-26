@@ -1,0 +1,13 @@
+dependency-audit:
+  stage: test
+  image: mcr.microsoft.com/dotnet/sdk:REPLACE-WITH-PINNED-VERSION
+  variables:
+    CI: "true"
+  script:
+    - dotnet restore --locked-mode
+    - dotnet list package --vulnerable --include-transitive --format json > vulnerable-packages.json
+  artifacts:
+    when: always
+    expire_in: 7 days
+    paths:
+      - vulnerable-packages.json

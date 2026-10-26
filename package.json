@@ -1,0 +1,9 @@
+{
+  "name": "security-kit",
+  "private": true,
+  "description": "Generic security kit for Claude Code: router skill, reviewer agent, reference library, hooks, and tools",
+  "scripts": {
+    "test": "node --test",
+    "scan": "node tools/prepublish-scan.cjs"
+  }
+}

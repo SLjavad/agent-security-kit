@@ -1,0 +1,44 @@
+{
+  "env": {
+    "SECURITY_HOOKS_MODE": "warn"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["__KIT_DIR__/hooks/security/guard-bash.cjs"],
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["__KIT_DIR__/hooks/security/scan-write.cjs"],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["__KIT_DIR__/hooks/security/post-edit-scan.cjs"],
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

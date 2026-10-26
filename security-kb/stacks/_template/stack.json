@@ -1,0 +1,10 @@
+{
+  "id": "template",
+  "name": "Name of the language, framework, and package manager",
+  "detect": ["manifest-or-project-file-pattern"],
+  "authoritativeSources": [
+    { "name": "Source name", "how": "How to consult it" }
+  ],
+  "verified": "YYYY-MM",
+  "docs": []
+}
