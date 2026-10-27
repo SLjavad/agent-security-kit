@@ -55,6 +55,49 @@ test('merge does not overwrite an existing hook mode', () => {
   assert.strictEqual(m.merge(base, patch, kitDir).settings.env.SECURITY_HOOKS_MODE, 'enforce')
 })
 
+test('a different node command never adds a second copy of a hook entry', () => {
+  const once = m.merge({}, patch, kitDir).settings
+  const other = JSON.parse(JSON.stringify(patch))
+  for (const entries of Object.values(other.hooks)) for (const e of entries) for (const h of e.hooks) h.command = 'C:/node/node.exe'
+  const twice = m.merge(once, other, kitDir)
+  assert.deepStrictEqual(twice.settings, once)
+  assert.deepStrictEqual(twice.added, [])
+})
+
+test('updateCommand rewrites the command of present entries in place, once', () => {
+  const once = m.merge({}, patch, kitDir).settings
+  const other = JSON.parse(JSON.stringify(patch))
+  for (const entries of Object.values(other.hooks)) for (const e of entries) for (const h of e.hooks) h.command = 'C:/node/node.exe'
+  const updated = m.merge(once, other, kitDir, { updateCommand: true })
+  assert.strictEqual(updated.added.length, 3)
+  assert.ok(updated.added.every((a) => /command updated/.test(a)))
+  assert.strictEqual(updated.settings.hooks.PreToolUse.length, 2)
+  assert.ok(Object.values(updated.settings.hooks).flat().every((e) => e.hooks[0].command === 'C:/node/node.exe'))
+  assert.deepStrictEqual(m.merge(updated.settings, other, kitDir, { updateCommand: true }).added, [])
+})
+
+test('updateEnv changes an existing hook mode, and says so', () => {
+  const base = m.merge({}, patch, kitDir).settings
+  const enforce = { ...patch, env: { SECURITY_HOOKS_MODE: 'enforce' } }
+  assert.strictEqual(m.merge(base, enforce, kitDir).settings.env.SECURITY_HOOKS_MODE, 'warn')
+  const changed = m.merge(base, enforce, kitDir, { updateEnv: true })
+  assert.strictEqual(changed.settings.env.SECURITY_HOOKS_MODE, 'enforce')
+  assert.deepStrictEqual(changed.added, ['env.SECURITY_HOOKS_MODE (changed from warn to enforce)'])
+  assert.deepStrictEqual(m.merge(changed.settings, enforce, kitDir, { updateEnv: true }).added, [])
+})
+
+test('hooks of other tools in similarly named folders are neither migrated nor removed', () => {
+  const foreign = [
+    { matcher: 'Bash', hooks: [{ type: 'command', command: 'node', args: ['C:/me/.claude/hooks/security/my-own-check.cjs'] }] },
+    { matcher: 'Bash', hooks: [{ type: 'command', command: 'node', args: ['C:/me/.claude/hooks/security-kit/mine.cjs'] }] }
+  ]
+  const base = { hooks: { PreToolUse: foreign } }
+  const merged = m.merge(base, patch, kitDir)
+  assert.ok(foreign.every((f) => merged.settings.hooks.PreToolUse.some((e) => JSON.stringify(e) === JSON.stringify(f))))
+  assert.ok(!merged.added.some((a) => /migrated/.test(a)))
+  assert.deepStrictEqual(m.remove(merged.settings).settings, base)
+})
+
 test('merge normalises Windows kit paths to forward slashes', () => {
   const { settings } = m.merge({}, patch, 'D:\\tools\\kit')
   assert.ok(JSON.stringify(settings).includes('D:/tools/kit/hooks/security-kit/scan-write.cjs'))

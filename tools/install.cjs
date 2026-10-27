@@ -20,7 +20,6 @@ const COPY_RULES = [
 
 const LEGACY_DIRS = ['skills/security', 'hooks/security']
 
-const posix = (p) => p.split(path.sep).join('/')
 const sha256 = (file) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
 const exists = (p) => fs.existsSync(p)
 
@@ -95,7 +94,7 @@ const readSettings = (file) => (exists(file) ? settingsTool.readJson(file) : { d
 const planSettings = (claudeDir, options) => {
   const file = path.join(claudeDir, 'settings.json')
   const current = readSettings(file)
-  const result = settingsTool.merge(current.data, prepareSettingsPatch(options), claudeDir)
+  const result = settingsTool.merge(current.data, prepareSettingsPatch(options), claudeDir, { updateCommand: Boolean(options.nodeCommand), updateEnv: options.hooksModeExplicit })
   return { file, current, result }
 }
 
@@ -183,7 +182,9 @@ const kitVersion = () => {
 }
 
 const parseArgs = (argv) => {
-  const args = { claudeDir: path.join(os.homedir(), '.claude'), dryRun: false, uninstall: false, hooksMode: 'warn', nodeCommand: null, force: false, settings: true, smoke: true, verbose: false, offline: false, pinReviewed: false }
+  const args = { claudeDir: path.join(os.homedir(), '.claude'), dryRun: false, uninstall: false, hooksMode: 'warn', nodeCommand: null, force: false, settings: true, smoke: true, verbose: false, offline: false, pinReviewed: true }
+  let pinFlag = false
+  let latestFlag = false
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--dry-run') args.dryRun = true
@@ -191,19 +192,25 @@ const parseArgs = (argv) => {
     else if (['--with-third-party', '--with-plugin-files', '--with-curated', '--include-unreviewed'].includes(a)) throw new Error(`${a} was removed: the full reviewed set is always installed. Use --offline to skip downloads.`)
     else if (a === '--uninstall') args.uninstall = true
     else if (a === '--offline') args.offline = true
-    else if (a === '--pin-reviewed') args.pinReviewed = true
+    else if (a === '--pin-reviewed') pinFlag = true
+    else if (a === '--latest') latestFlag = true
     else if (a === '--force') args.force = true
     else if (a === '--no-settings') args.settings = false
     else if (a === '--no-smoke-test') args.smoke = false
     else if (a === '--verbose') args.verbose = true
     else if (a === '--claude-dir') args.claudeDir = argv[++i]
-    else if (a === '--hooks-mode') args.hooksMode = argv[++i]
+    else if (a === '--hooks-mode') {
+      args.hooksMode = argv[++i]
+      args.hooksModeExplicit = true
+    }
     else if (a === '--node-command') args.nodeCommand = argv[++i]
     else throw new Error(`unknown argument: ${a}`)
   }
   if (!['warn', 'enforce'].includes(args.hooksMode)) throw new Error('--hooks-mode must be warn or enforce')
   if (!args.claudeDir) throw new Error('--claude-dir needs a value')
-  if (args.offline && args.pinReviewed) throw new Error('--offline and --pin-reviewed cannot be combined: --offline downloads nothing')
+  if (pinFlag && latestFlag) throw new Error('--pin-reviewed and --latest cannot be combined')
+  if (args.offline && (pinFlag || latestFlag)) throw new Error(`--offline and ${pinFlag ? '--pin-reviewed' : '--latest'} cannot be combined: --offline downloads nothing`)
+  args.pinReviewed = !latestFlag
   args.claudeDir = path.resolve(args.claudeDir)
   args.apply = !args.dryRun
   return args
@@ -242,7 +249,7 @@ const install = (args) => {
   else log('Settings: skipped (--no-settings)')
   if (args.offline) log('Third-party: skipped (--offline). Run again without it to add the audit, OWASP, and Trail of Bits skills.')
   else {
-    log('Third-party sources (latest upstream commit that passes the automatic check, else the reviewed commit):')
+    log(args.pinReviewed ? 'Third-party sources (pinned to the reviewed commits; --latest takes newer upstream commits that pass the automatic check):' : 'Third-party sources (latest upstream commit that passes the automatic check, else the reviewed commit):')
     for (const t of third) {
       log(`  ${t.source.id} [${t.source.license}]: ${t.resolved.mode} ${t.resolved.sha.slice(0, 12)}. ${t.resolved.note}`)
       for (const i of t.items) log(`    ${i.to}${i.exists ? (i.owned ? '  (update)' : '  (already exists)') : ''}`)

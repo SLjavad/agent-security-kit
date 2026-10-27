@@ -45,6 +45,8 @@ Runs the hook, installer, fetcher, scanner, settings-merge, and kit-lint tests. 
 
 Hooks start in warn mode: they log findings and never block. Each project gets its own log, `~/.claude/hooks/security-kit/logs/<project-name>-<short-id>/findings.jsonl`. The project is the nearest parent folder containing `.git` (else the working directory), and the short id is a hash of its full path, so two projects with the same folder name stay apart; findings with no working directory go to `_unknown`. A line holds only the time, the hook, the rule name, and the file's base name, never matched text or paths. A log is renamed to `findings.1.jsonl` when it reaches 1 MB (one backup is kept, so a project uses at most about 2 MB). `SECURITY_HOOKS_LOG_DIR` moves the whole logs folder and `SECURITY_HOOKS_LOG_MAX_BYTES` changes the size limit. Switch to blocking by setting `SECURITY_HOOKS_MODE` to `enforce` in the settings `env` block. In enforce mode the pre-tool hooks exit with code 2 (blocking, with the reason on stderr) and the post-edit hook exits 2 to show its findings to Claude after the edit.
 
+The shell guard checks what the shell will run (not the tool's `description` text) against its shell rules and the secret patterns, so a key typed into a command is caught as well as one written to a file. `cp .env.example .env` is allowed; reading or copying `.env` itself is not. Name rules (`.example`, `.sample`, `.template`) exempt a file by its own name only, never because of a folder name.
+
 Not included yet: a gitleaks call inside the post-edit hook. gitleaks documents `gitleaks dir <path>` and `--redact`; add and test it after you install the tool.
 
 ## Installing
@@ -85,11 +87,12 @@ Options:
 |---|---|
 | `--dry-run` | Preview only: list what would happen and change nothing |
 | `--claude-dir <dir>` | Install somewhere other than `~/.claude` (useful for trying it out) |
-| `--hooks-mode <warn or enforce>` | Hook mode written to settings (default `warn`) |
-| `--node-command <path>` | Command used to start the hooks, for example an absolute path to node (default `node`) |
+| `--hooks-mode <warn or enforce>` | Hook mode written to settings (default `warn`). On a later run an existing mode is kept unless you pass this option, which changes it |
+| `--node-command <path>` | Command used to start the hooks, for example an absolute path to node (default `node`). On a later run existing hook entries keep their command unless you pass this option, which rewrites it in place |
 | `--no-settings` | Copy files only; do not touch `settings.json` |
 | `--offline` | Skip the third-party downloads (install the kit's own files only) |
-| `--pin-reviewed` | Install the exact commits that were reviewed instead of the latest upstream commit |
+| `--pin-reviewed` | Install the exact commits that were reviewed. This is the default; the flag is accepted for clarity |
+| `--latest` | Take the newest upstream commit of each third-party source when it passes the automatic check (see "Third-party versions"), instead of the reviewed commit |
 | `--verbose` | List every file |
 | `--force` | Replace conflicting files after backing them up |
 | `--no-smoke-test` | Skip the post-install checks |
@@ -100,13 +103,27 @@ The old `--with-third-party`, `--with-plugin-files`, `--with-curated`, and `--in
 
 ### Third-party versions
 
-None of the three upstream repositories publishes tags or releases, so "latest" means the head of its default branch. Installing whatever is there unchecked would let an upstream change alter your agent's instructions after you reviewed it, so the installer compares the head with the commit that was reviewed (`reviewedSha` in `third-party/lock.json`):
+By default the installer installs exactly the commit that was reviewed (`reviewedSha` in `third-party/lock.json`). The kit's own guidance (`security-kb/core/ai-tooling-security.md`) says to pin commits, because an upstream change can alter your agent's instructions after you reviewed them. Pass `--latest` to take newer upstream commits instead.
+
+None of the three upstream repositories publishes tags or releases, so "latest" means the head of its default branch. With `--latest` the installer compares the head with the reviewed commit:
 
 1. Head equals the reviewed commit: installed as is.
 2. Head is newer: the installer fetches both and looks only at files under the installed paths (files the lock removes are ignored). The newer commit is installed only if every changed file is plain documentation (`.md`, `.mdx`, `.txt`, `.json`), nothing became executable or a symbolic link, the added lines contain no hidden Unicode, download-into-shell, instruction-override phrases, long encoded blobs, or changed `tools`/`allowed-tools`/`hooks` declarations, A text patch from the lock that no longer applies is caught at install time, and the reviewed commit is installed instead.
 3. Anything else: the reviewed commit is installed and the dry run and the install output say why.
 
-The dry run shows the decision for each source (`reviewed`, `latest`, or `reviewed-fallback`) before anything is written, and the manifest records the installed commit and the reviewed commit. The automatic check is not a review: a newer documentation change can still be wrong in ways a pattern check cannot see. Use `--pin-reviewed` for exactly the reviewed commits.
+The dry run shows the decision for each source (`reviewed`, `latest`, or `reviewed-fallback`) before anything is written, and the manifest records the installed commit and the reviewed commit. The automatic check is not a review: a newer documentation change can still be wrong in ways a pattern check cannot see, which is why `--latest` is opt-in. Review the dry-run output before using it.
+
+### Permissions the third-party skills ask for
+
+Some installed third-party skills declare `allowed-tools` in their front matter, which lets the skill use those tools while it is active. Two are broader than a review needs, and the agent trims in `third-party/lock.json` do not change them:
+
+| Skill | Declared tools | Breadth |
+|---|---|---|
+| `differential-review` | Read, Write, Grep, Glob, Bash | Can write files (its reports) and run shell commands |
+| `fp-check` | Read, Grep, Glob, LSP, Bash, Task, Write, Edit, AskUserQuestion, and the task tools | Can edit files and run shell commands (it builds proof-of-concept exploits) |
+| `sharp-edges`, `audit-context-building` | Read, Grep, Glob (the latter also Task) | Read-only apart from launching subagents |
+
+Check your own permission rules before you run these two on a project you care about: `deny` and `ask` rules in `settings.json` still apply and are the place to limit them, and the kit's shell guard hook still sees every Bash call they make. The `function-analyzer` agent also keeps `Write` because it writes its analysis to disk. If you want a stricter set, edit the front matter of the installed skill; the next install then reports that folder as a conflict and changes nothing until you resolve it or pass `--force`, and an uninstall keeps it as modified.
 
 After installing, restart Claude Code sessions. Review the project logs under `~/.claude/hooks/security-kit/logs/` for a few days before choosing `enforce`.
 
@@ -133,6 +150,7 @@ Keep the terms file (internal names you must never publish) outside the reposito
 
 ## Limits
 
+- **Overlapping triggers.** The installed `owasp-security`, `security-audit`, and `differential-review` skills have their own descriptions that also match "security review". The router's description asks to be used first and its "Routing among security skills" section restates the tier rules, but which skill starts first is the model's choice and the kit cannot force it. The installed third-party descriptions are not patched.
 - Intrusion detection, live traffic monitoring, and penetration testing of running systems are operational work; this kit gives checklists, not detection.
 - AI review does not replace a human penetration test for systems that handle money or identity.
 - Stack documents cite their sources and the date they were checked, and mark statements without a fetched source as general practice. Re-check version-specific statements for your target version. Only the `dotnet` stack is populated so far; other stacks need the same research before they are added.

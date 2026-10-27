@@ -170,12 +170,19 @@ test('parseArgs rejects unknown flags', () => {
   assert.throws(() => fetcher.parseArgs(['--nope']), /unknown argument/)
 })
 
+test('the reviewed commit is the default; --latest opts into newer upstream commits', () => {
+  assert.strictEqual(fetcher.parseArgs([]).pinReviewed, true)
+  assert.strictEqual(fetcher.parseArgs(['--pin-reviewed']).pinReviewed, true)
+  assert.strictEqual(fetcher.parseArgs(['--latest']).pinReviewed, false)
+  assert.deepStrictEqual(fetcher.resolve(source()), { sha: goodSha, mode: 'reviewed', note: 'pinned to the reviewed commit' })
+})
+
 test('dry run lists the plan and writes nothing', () => {
   const target = path.join(tmp, 'dry-target')
-  const r = spawnSync(process.execPath, [path.join(__dirname, 'fetch-third-party.cjs'), '--target', target, '--pin-reviewed'], { encoding: 'utf8' })
+  const r = spawnSync(process.execPath, [path.join(__dirname, 'fetch-third-party.cjs'), '--target', target], { encoding: 'utf8' })
   assert.strictEqual(r.status, 0)
   assert.match(r.stdout, /Plan \(dry run/)
-  assert.match(r.stdout, /agamm-owasp: reviewed [0-9a-f]{12} \(pinned to the reviewed commit by request\)/)
+  assert.match(r.stdout, /agamm-owasp: reviewed [0-9a-f]{12} \(pinned to the reviewed commit\)/)
   assert.ok(!/curated/.test(r.stdout))
   assert.ok(!fs.existsSync(target))
 })

@@ -136,6 +136,51 @@ test('the skill and hooks folders are named security-kit, and the logs live unde
   assert.ok(!/\/security (quick|pr|advisories|audit|deep)/.test(skill), 'commands use the /security-kit prefix')
 })
 
+test('the router names every skill the lock file installs and says how to route among them', () => {
+  const router = read(root, 'skills', 'security-kit', 'SKILL.md')
+  const lock = JSON.parse(read(root, 'third-party', 'lock.json'))
+  const skills = lock.sources.flatMap((s) => s.include.map((i) => i.to)).filter((to) => /^skills\/[^/]+$/.test(to)).map((to) => to.slice('skills/'.length))
+  assert.ok(skills.length >= 7)
+  for (const name of skills) assert.ok(router.includes(`\`${name}\``), `router does not mention ${name}`)
+  assert.match(router, /## Routing among security skills/)
+  assert.match(read(root, 'README.md'), /Overlapping triggers/)
+})
+
+test('CI templates leave no image unpinned unless it is a marked placeholder with instructions', () => {
+  const files = []
+  const collect = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.isDirectory()) collect(path.join(dir, e.name))
+      else if (/\.ya?ml$/.test(e.name)) files.push(path.join(dir, e.name))
+    }
+  }
+  collect(path.join(kb, 'templates'))
+  collect(stacksDir)
+  assert.ok(files.length >= 4)
+  for (const file of files) {
+    const text = fs.readFileSync(file, 'utf8')
+    const images = [...text.matchAll(/^\s*image:\s*(\S+)\s*$|^\s*name:\s*(\S+@\S+|\S*:\S+)\s*$/gm)].map((m) => m[1] || m[2])
+    for (const image of images) {
+      if (/@sha256:[0-9a-f]{64}$/.test(image)) continue
+      assert.match(image, /REPLACE-WITH/, `${path.relative(root, file)}: ${image} is neither pinned by digest nor a placeholder`)
+      assert.match(text.split(/\r?\n/).slice(0, 3).join('\n'), /Replace REPLACE-WITH/, `${path.relative(root, file)}: placeholder needs instructions in the first lines`)
+    }
+  }
+})
+
+test('the dependency audit job fails on high or critical findings and on unreadable vulnerability data', () => {
+  const job = read(stacksDir, 'dotnet', 'templates', 'gitlab-ci-dependency-audit.yml')
+  assert.match(job, /--format json > vulnerable-packages\.json/)
+  assert.match(job, /grep -Eq '"severity": \*"\(High\|Critical\)"' vulnerable-packages\.json; then .*exit 1/)
+  assert.match(job, /grep -q '"problems"' vulnerable-packages\.json; then .*exit 1/)
+})
+
+test('the secret-scan template tells how to use the kit allowlist', () => {
+  const template = read(kb, 'templates', 'gitlab-ci-secret-scan.yml')
+  assert.match(template, /\.gitleaks\.toml/)
+  assert.ok(fs.existsSync(path.join(kb, 'templates', 'gitleaks.toml')))
+})
+
 test('settings patch points at hook scripts that exist', () => {
   const patch = JSON.parse(read(root, 'settings.patch.json'))
   const scripts = JSON.stringify(patch).match(/__KIT_DIR__\/hooks\/security-kit\/[\w.-]+\.cjs/g) || []

@@ -1,8 +1,9 @@
 const fs = require('fs')
 const path = require('path')
 
-const KIT_PATH = /[\\/]hooks[\\/]security(-kit)?[\\/]/
-const LEGACY_KIT_PATH = /[\\/]hooks[\\/]security[\\/]/
+// Only the kit's own hook scripts count as kit entries, so another tool's hook in a similarly named folder is left alone.
+const KIT_PATH = /[\\/]hooks[\\/]security(-kit)?[\\/](?:guard-bash|scan-write|post-edit-scan)\.cjs$/
+const LEGACY_KIT_PATH = /[\\/]hooks[\\/]security[\\/](?:guard-bash|scan-write|post-edit-scan)\.cjs$/
 
 const readJson = (file) => {
   const raw = fs.readFileSync(file, 'utf8')
@@ -14,7 +15,8 @@ const readJson = (file) => {
   }
 }
 
-const entryKey = (entry) => `${entry.matcher || ''}|${(entry.hooks || []).map((h) => [h.command, ...(h.args || [])].join(' ')).join(';')}`
+// An entry is identified by its matcher and script arguments, not by the command that starts it, so changing the node command never adds a second copy.
+const entryKey = (entry) => `${entry.matcher || ''}|${(entry.hooks || []).map((h) => (h.args || []).join(' ')).join(';')}`
 
 const matchesPath = (entry, re) => (entry.hooks || []).some((h) => (h.args || []).some((a) => re.test(a)))
 
@@ -24,7 +26,9 @@ const isLegacyEntry = (entry) => matchesPath(entry, LEGACY_KIT_PATH)
 
 const resolvePatch = (patch, kitDir) => JSON.parse(JSON.stringify(patch).split('__KIT_DIR__').join(kitDir.replace(/\\/g, '/')))
 
-const merge = (settings, patch, kitDir) => {
+// Options: updateCommand rewrites the command of an entry that is already present (an explicit --node-command);
+// updateEnv overwrites env values that are already set (an explicit --hooks-mode). Without them existing values are kept.
+const merge = (settings, patch, kitDir, { updateCommand = false, updateEnv = false } = {}) => {
   const resolved = resolvePatch(patch, kitDir)
   const out = JSON.parse(JSON.stringify(settings))
   const added = []
@@ -32,6 +36,10 @@ const merge = (settings, patch, kitDir) => {
     out.env = { ...resolved.env, ...(out.env || {}) }
     Object.keys(resolved.env).forEach((k) => {
       if (!(settings.env && k in settings.env)) added.push(`env.${k}`)
+      else if (updateEnv && settings.env[k] !== resolved.env[k]) {
+        out.env[k] = resolved.env[k]
+        added.push(`env.${k} (changed from ${settings.env[k]} to ${resolved.env[k]})`)
+      }
     })
   }
   for (const [event, entries] of Object.entries(resolved.hooks || {})) {
@@ -41,9 +49,21 @@ const merge = (settings, patch, kitDir) => {
     const migrated = existing.length - out.hooks[event].length
     if (migrated) added.push(`hooks.${event} (migrated ${migrated} entr${migrated === 1 ? 'y' : 'ies'} from hooks/security to hooks/security-kit)`)
     for (const entry of entries) {
-      if (out.hooks[event].some((existing) => entryKey(existing) === entryKey(entry))) continue
-      out.hooks[event].push(entry)
-      added.push(`hooks.${event}[${entry.matcher || '*'}]`)
+      const present = out.hooks[event].find((existing) => entryKey(existing) === entryKey(entry))
+      if (!present) {
+        out.hooks[event].push(entry)
+        added.push(`hooks.${event}[${entry.matcher || '*'}]`)
+        continue
+      }
+      if (!updateCommand) continue
+      let changed = false
+      present.hooks.forEach((hook, i) => {
+        if (entry.hooks[i] && hook.command !== entry.hooks[i].command) {
+          hook.command = entry.hooks[i].command
+          changed = true
+        }
+      })
+      if (changed) added.push(`hooks.${event}[${entry.matcher || '*'}] (command updated)`)
     }
   }
   return { settings: out, added }

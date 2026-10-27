@@ -190,6 +190,23 @@ test('--hooks-mode, --node-command, and --no-settings are honoured', () => {
   assert.ok(!fs.existsSync(path.join(b, 'settings.json')))
 })
 
+test('reinstalling with --node-command or --hooks-mode changes the existing entries instead of adding more', () => {
+  const claude = newClaudeDir()
+  assert.strictEqual(install(sharedKit, claude, '--no-smoke-test').code, 0)
+  const again = install(sharedKit, claude, '--node-command', 'C:/node/node.exe', '--hooks-mode', 'enforce', '--no-smoke-test')
+  assert.strictEqual(again.code, 0, again.out + again.err)
+  assert.match(again.out, /command updated/)
+  assert.match(again.out, /changed from warn to enforce/)
+  const settings = JSON.parse(fs.readFileSync(path.join(claude, 'settings.json'), 'utf8'))
+  assert.strictEqual(settings.env.SECURITY_HOOKS_MODE, 'enforce')
+  assert.strictEqual(settings.hooks.PreToolUse.length, 2)
+  assert.strictEqual(settings.hooks.PostToolUse.length, 1)
+  assert.ok(Object.values(settings.hooks).flat().every((e) => e.hooks[0].command === 'C:/node/node.exe'))
+  const plain = install(sharedKit, claude, '--no-smoke-test')
+  assert.match(plain.out, /already up to date/)
+  assert.strictEqual(JSON.parse(fs.readFileSync(path.join(claude, 'settings.json'), 'utf8')).env.SECURITY_HOOKS_MODE, 'enforce')
+})
+
 test('invalid input aborts before any write', () => {
   const claude = newClaudeDir()
   fs.writeFileSync(path.join(claude, 'settings.json'), '{ not json')
@@ -207,6 +224,8 @@ test('invalid input aborts before any write', () => {
     assert.match(r.err, /was removed: the full reviewed set is always installed/)
   }
   assert.strictEqual(install(sharedKit, claude, '--pin-reviewed', '--offline').code, 1)
+  assert.strictEqual(install(sharedKit, claude, '--latest', '--offline').code, 1)
+  assert.strictEqual(install(sharedKit, claude, '--latest', '--pin-reviewed').code, 1)
 })
 
 test('a failure while copying rolls everything back', () => {
@@ -374,6 +393,8 @@ test('parseArgs defaults to the home .claude directory and a real install', () =
   assert.strictEqual(args.dryRun, false)
   assert.strictEqual(args.apply, true)
   assert.strictEqual(args.hooksMode, 'warn')
+  assert.strictEqual(args.pinReviewed, true)
+  assert.strictEqual(parseArgs(['--latest']).pinReviewed, false)
 })
 
 test('running with no flags installs, and --dry-run on a second target changes nothing', () => {

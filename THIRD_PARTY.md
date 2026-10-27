@@ -2,7 +2,7 @@
 
 This kit does not contain third-party files. `tools/install.cjs` (through `tools/fetch-third-party.cjs`) downloads them from the sources below when you install. `third-party/lock.json` records, for each source, the commit that was reviewed (`reviewedSha`), the installed paths, and the trims and text patches applied after download.
 
-Which commit is installed: the latest upstream commit when it passes the automatic check described in `README.md` ("Third-party versions"), otherwise the reviewed commit. `--pin-reviewed` always installs the reviewed commit. None of these repositories publishes tags or releases, so "latest" is the head of the default branch. The lock file refuses to load if a source's recorded review commit differs from its pinned fallback, so changing the fallback forces a fresh review.
+Which commit is installed: the reviewed commit, by default. With `--latest`, the newest upstream commit is installed when it passes the automatic check described in `README.md` ("Third-party versions"), otherwise the reviewed commit. None of these repositories publishes tags or releases, so "latest" is the head of the default branch. The lock file refuses to load if a source's recorded review commit differs from its pinned fallback, so changing the fallback forces a fresh review.
 
 | Id | Source | Licence | Reviewed commit | Installed as | Review (2026-10-26, Trail of Bits re-scoped 2026-10-27) |
 |---|---|---|---|---|---|
@@ -26,7 +26,7 @@ No malicious content: no hidden Unicode instructions, no exfiltration endpoints 
 2. **Trail of Bits `tests/eval.sh` runs `claude -p --permission-mode bypassPermissions`** against a cloned vulnerable checkout. It is a developer evaluation script and not part of using the skills. Tests and evals are not installed.
 3. **Where Trail of Bits workflows write and read:** `audit-context.js` writes `audit-context/` into the working directory unless you pass `outDir`; `variants.js` falls back to listing directory names under your home folder; the `differential-review` skill may write reports to the working directory, the Desktop, or `~/.claude/skills/...`. The workflows themselves are not installed.
 4. **`insecure-defaults` quotes matching lines into model context and its report** when run as its workflow. Only its reference documents are installed.
-5. **Tool breadth in front matter:** the `differential-review` and `fp-check` skills declare Write and Bash (and Edit for `fp-check`) in `allowed-tools`. The agent trims in the lock file do not change what the skills themselves may do. The `function-analyzer` agent keeps its `Write` tool because it writes its analysis to disk.
+5. **Tool breadth in front matter:** the `differential-review` skill declares `Read Write Grep Glob Bash` and `fp-check` declares `Read Grep Glob LSP Bash Task Write Edit AskUserQuestion` plus the task tools in `allowed-tools`. The agent trims in the lock file do not change what the skills themselves may do. The `function-analyzer` agent keeps its `Write` tool because it writes its analysis to disk. `README.md` ("Permissions the third-party skills ask for") says how to limit this.
 
 ## Changes applied after download
 

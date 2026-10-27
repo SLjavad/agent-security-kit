@@ -7,6 +7,9 @@ const patterns = JSON.parse(fs.readFileSync(path.join(__dirname, 'patterns.json'
 
 const compile = (rule) => new RegExp(rule.regex, rule.flags || '')
 
+// A rule may carry an `unless` expression: when the whole text matches it, the rule does not apply.
+const compileRule = (rule) => ({ id: rule.id, re: compile(rule), unless: rule.unless ? new RegExp(rule.unless, rule.flags || '') : null })
+
 const compileDrift = (rule) => {
   const base = { id: rule.id, files: new RegExp(rule.files, 'i') }
   if (rule.regex) return { ...base, re: compile(rule) }
@@ -50,9 +53,10 @@ const loadStackDriftRules = () => {
 }
 
 const compiled = {
-  secrets: patterns.secrets.map((r) => ({ id: r.id, re: compile(r) })),
-  bash: patterns.bash.map((r) => ({ id: r.id, re: compile(r) })),
+  secrets: patterns.secrets.map(compileRule),
+  bash: patterns.bash.map(compileRule),
   configDrift: [...patterns.configDrift.map(compileDrift), ...loadStackDriftRules()],
+  excludeNames: patterns.excludeNames.map((p) => new RegExp(p, 'i')),
   excludePaths: patterns.excludePaths.map((p) => new RegExp(p, 'i'))
 }
 
@@ -77,9 +81,12 @@ const collectStrings = (value, out = []) => {
   return out
 }
 
-const isExcludedPath = (file) => Boolean(file) && compiled.excludePaths.some((re) => re.test(file))
+const baseName = (file) => file.split(/[\\/]/).pop()
 
-const scan = (rules, text) => rules.filter((r) => r.re.test(text)).map((r) => r.id)
+// Name rules look at the file name only, so a folder called foo.example.com does not exempt its contents.
+const isExcludedPath = (file) => Boolean(file) && (compiled.excludeNames.some((re) => re.test(baseName(file))) || compiled.excludePaths.some((re) => re.test(file)))
+
+const scan = (rules, text) => rules.filter((r) => r.re.test(text) && !(r.unless && r.unless.test(text))).map((r) => r.id)
 
 const driftMatches = (rule, file, text) => {
   if (!rule.files.test(file)) return false
@@ -133,11 +140,16 @@ const logFinding = (hook, rule, target) => {
   }
 }
 
+const HINTS = {
+  'guard-bash': 'Rewrite the command without the flagged part, or ask the user to run it themselves.',
+  'post-edit-scan': 'Fix what was flagged, and move any secret to a secret store.'
+}
+
 const report = (hook, ids, target, verb = 'blocked') => {
   if (ids.length === 0) return 0
   ids.forEach((id) => logFinding(hook, id, target))
   if (mode() !== 'enforce') return 0
-  process.stderr.write(`security-hook ${hook}: ${verb} by rule(s) ${ids.join(', ')} for ${target}. Remove the value or move it to a secret store.\n`)
+  process.stderr.write(`security-hook ${hook}: ${verb} by rule(s) ${ids.join(', ')} for ${target}. ${HINTS[hook] || 'Remove the value or move it to a secret store.'}\n`)
   return 2
 }
 

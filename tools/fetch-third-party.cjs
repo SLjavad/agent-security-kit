@@ -123,9 +123,9 @@ const gateChanges = (source, repoDir, from, to) => {
   return { reasons, changed: changes.length }
 }
 
-const resolve = (source, { pinReviewed = false } = {}) => {
+const resolve = (source, { pinReviewed = true } = {}) => {
   const reviewed = { sha: source.sha, mode: 'reviewed', note: null }
-  if (pinReviewed) return { ...reviewed, note: 'pinned to the reviewed commit by request' }
+  if (pinReviewed) return { ...reviewed, note: 'pinned to the reviewed commit' }
   let head
   try {
     head = remoteHead(source)
@@ -198,12 +198,13 @@ const apply = (source, target, force, resolved = { sha: source.sha, mode: 'revie
 }
 
 const parseArgs = (argv) => {
-  const args = { only: null, target: null, apply: false, force: false, list: false, pinReviewed: false }
+  const args = { only: null, target: null, apply: false, force: false, list: false, pinReviewed: true }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--apply') args.apply = true
     else if (a === '--force') args.force = true
     else if (a === '--pin-reviewed') args.pinReviewed = true
+    else if (a === '--latest') args.pinReviewed = false
     else if (a === '--list') args.list = true
     else if (a === '--only') args.only = String(argv[++i] || '').split(',').filter(Boolean)
     else if (a === '--target') args.target = argv[++i]

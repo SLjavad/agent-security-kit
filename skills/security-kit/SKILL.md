@@ -1,6 +1,6 @@
 ---
 name: security-kit
-description: Security router for software projects in any language or framework. Picks the right depth of security review (quick, per-PR, full audit, deep) and the right method or reference for the question, using framework-neutral guidance plus stack-specific notes when the project's stack is detected. Use for security reviews, vulnerability questions, hardening, secrets, dependencies, authentication and authorization, cryptography, data protection, supply chain, CI/CD security, recently published CVEs and advisories that affect a project, or any "is this safe to ship" request. Explicit commands /security-kit quick, /security-kit pr, /security-kit advisories, /security-kit audit, /security-kit deep.
+description: Security router for software projects in any language or framework; use it first for any security request, because it chooses among the other installed security skills. Picks the right depth of security review (quick, per-PR, full audit, deep) and the right method or reference for the question, using framework-neutral guidance plus stack-specific notes when the project's stack is detected. Use for security reviews, vulnerability questions, hardening, secrets, dependencies, authentication and authorization, cryptography, data protection, supply chain, CI/CD security, recently published CVEs and advisories that affect a project, or any "is this safe to ship" request. Explicit commands /security-kit quick, /security-kit pr, /security-kit advisories, /security-kit audit, /security-kit deep.
 argument-hint: "[quick|pr|advisories|audit|deep] [path or topic]"
 ---
 
@@ -30,6 +30,10 @@ Without a command, match the request to a tier using the table below.
 | 3 | Only on an explicit request: "deep review", "fuzz this", "prepare for pentest", `/security-kit deep` | `security-audit` deep profile plus specialised skills |
 
 Never start tier 2 or 3 on your own. Never escalate silently.
+
+## Routing among security skills
+
+`owasp-security`, `security-audit`, `differential-review`, `sharp-edges`, `fp-check`, `audit-context-building`, and `variant-analysis` have triggers of their own that overlap with this router's. If one of them starts first for a review request, apply the tiers and the rules below anyway: offer tier 1 rather than running a full workflow, never start tier 2 or 3 unasked, and show the plan table before any subagent.
 
 ## Stacks
 
