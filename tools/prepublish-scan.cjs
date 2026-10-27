@@ -4,7 +4,7 @@ const path = require('path')
 const SKIP_DIRS = new Set(['.git', 'node_modules'])
 const MAX_BYTES = 2 * 1024 * 1024
 
-const patterns = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'hooks', 'security', 'patterns.json'), 'utf8'))
+const patterns = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'hooks', 'security-kit', 'patterns.json'), 'utf8'))
 
 const rules = [
   ...patterns.secrets.map((r) => ({ id: `secret:${r.id}`, re: new RegExp(r.regex, r.flags || '') })),

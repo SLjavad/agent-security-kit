@@ -1,54 +1,52 @@
 # Third-party sources
 
-This kit does not contain third-party files. `tools/fetch-third-party.cjs` and `tools/install.cjs --with-third-party` fetch them at the commits pinned in `third-party/lock.json`. Never track a branch. The lock file refuses to load if a source's recorded review commit (`reviewedSha`) differs from its pin, so changing a pin forces a fresh review.
+This kit does not contain third-party files. `tools/install.cjs` (through `tools/fetch-third-party.cjs`) downloads them from the sources below when you install. `third-party/lock.json` records, for each source, the commit that was reviewed (`reviewedSha`), the installed paths, and the trims and text patches applied after download.
 
-| Id | Source | Licence | Pinned commit | Used for | Review (2026-10-26) | Install |
-|---|---|---|---|---|---|---|
-| cloudflare-security-audit | https://github.com/cloudflare/security-audit-skill | MIT | `c1c8a8c1471069fb0e188eeaff69b8e8db6564a8` | `skills/security-audit` (tier 2 and 3 method) | partial: executables read, main files read, companion files pattern-scanned | with `--with-third-party` |
-| agamm-owasp | https://github.com/agamm/claude-code-owasp | MIT | `8ac7965caa212b4a850aff8d3df0081ab3fa9eed` | `skills/owasp-security` | partial: all files pattern-scanned, no executables | with `--with-third-party` |
-| trailofbits-skills | https://github.com/trailofbits/skills | CC-BY-SA-4.0 | `196a9073ab10d35bacf111f945e02c00b2c6883a` | Plugins: differential-review, insecure-defaults, sharp-edges, audit-context-building, variant-analysis, fp-check | partial: executables read or pattern-scanned, main files read | files only with `--with-plugin-files`; activation is manual |
-| mukul975-curated | https://github.com/mukul975/Anthropic-Cybersecurity-Skills | Apache-2.0 | `54a798831d2266a3ca61ce68a7acb80b81160d57` | 30 reference skills under `security-kb/curated/` | partial: all files pattern-scanned, all SKILL.md summarised, 2 read in full | optional: `--with-curated` |
-| masriyan-curated | https://github.com/Masriyan/Claude-Code-CyberSecurity-Skill | MIT (its NOTICE requires attribution in redistributions) | `3aa77d84fb64cf07b550f6be4544bb91292db89f` | Skills 09, 13, 19, 20 as reference material | partial: all files pattern-scanned, all SKILL.md summarised, 09 read in full | optional: `--with-curated` |
+Which commit is installed: the latest upstream commit when it passes the automatic check described in `README.md` ("Third-party versions"), otherwise the reviewed commit. `--pin-reviewed` always installs the reviewed commit. None of these repositories publishes tags or releases, so "latest" is the head of the default branch. The lock file refuses to load if a source's recorded review commit differs from its pinned fallback, so changing the fallback forces a fresh review.
+
+| Id | Source | Licence | Reviewed commit | Installed as | Review (2026-10-26, Trail of Bits re-scoped 2026-10-27) |
+|---|---|---|---|---|---|
+| cloudflare-security-audit | https://github.com/cloudflare/security-audit-skill | MIT | `c1c8a8c1471069fb0e188eeaff69b8e8db6564a8` | `skills/security-audit` (tier 2 and 3 method) | partial: executables read, main files read, companion files pattern-scanned |
+| agamm-owasp | https://github.com/agamm/claude-code-owasp | MIT | `8ac7965caa212b4a850aff8d3df0081ab3fa9eed` | `skills/owasp-security` | partial: all files pattern-scanned, no executables |
+| trailofbits-skills | https://github.com/trailofbits/skills | CC-BY-SA-4.0 | `196a9073ab10d35bacf111f945e02c00b2c6883a` | Skills `differential-review`, `sharp-edges`, `audit-context-building`, `variant-analysis`, `fp-check`; six agents; `security-kb/third-party/insecure-defaults` (reference documents) | partial: executables read or pattern-scanned, main files read |
 
 `partial` is used for everything: no source was read line by line. The full per-source scope and notes are in `third-party/lock.json` (`reviewScope`, `reviewNotes`).
 
 ## What the review covered
 
-- **Pattern scan of all 353 fetched files:** hidden or bidirectional Unicode, prompt-injection phrases, hidden HTML comments, exfiltration phrases, pipe-to-shell, reverse-shell and persistence patterns, credential paths, long encoded blobs, active SVG content, front-matter privilege keys, symlinks, binaries, and every URL domain.
+- **Pattern scan of all fetched files:** hidden or bidirectional Unicode, prompt-injection phrases, hidden HTML comments, exfiltration phrases, pipe-to-shell, reverse-shell and persistence patterns, credential paths, long encoded blobs, active SVG content, front-matter privilege keys, symlinks, binaries, and every URL domain.
 - **Executables read:** Cloudflare's two validators; Trail of Bits' three workflow scripts (`variants.js`, `audit-context.js`, `audit.js`), shell scripts, and Python tests; agent and command files.
-- **Skills read:** all 38 curated `SKILL.md` files summarised (4 artifact-signing skills were dropped afterwards, leaving 34) (description, sections, every instruction line outside code); `auditing-mcp-servers-for-tool-poisoning` and `09-web-security` read in full; all 34 mukul975 licence files compared (identical Apache-2.0 text).
+- **Skills read:** the Cloudflare and Trail of Bits main skill files and the OWASP skill layout.
 
 ## What it found
 
-No malicious content: no hidden Unicode instructions, no exfiltration endpoints or paste or webhook domains, no binaries, no active SVG content, no symlinks. The two prompt-injection phrases and the zero-width character set are defensive examples inside prompt-injection skills. Findings worth knowing:
+No malicious content: no hidden Unicode instructions, no exfiltration endpoints or paste or webhook domains, no binaries, no active SVG content, no symlinks. Findings worth knowing:
 
 1. **Cloudflare validators cannot run on native Windows.** They refuse to read input unless `O_NOFOLLOW` and `O_NONBLOCK` exist; both are undefined in Node on Windows (checked on this machine), so the guard always fails. The skill requires both validators to pass, so full audits need WSL, Linux, or macOS. The validators themselves are read-only and use no network, environment variables, child processes, or writes.
-2. **Trail of Bits `tests/eval.sh` runs `claude -p --permission-mode bypassPermissions`** against a cloned vulnerable checkout. It is a developer evaluation script and not part of using the plugin, so all `tests/` and `evals/` folders are removed on install.
-3. **Where Trail of Bits workflows write and read:** `audit-context.js` writes `audit-context/` into the working directory (inside the audited repository) unless you pass `outDir`; `variants.js` falls back to listing directory names under your home folder to locate its reference files; the `differential-review` skill may write reports to the working directory, the Desktop, or `~/.claude/skills/...`.
-4. **`insecure-defaults` quotes matching lines into model context and its report.** Those lines can contain literal credentials from configuration files. Run it only where that is acceptable.
+2. **Trail of Bits `tests/eval.sh` runs `claude -p --permission-mode bypassPermissions`** against a cloned vulnerable checkout. It is a developer evaluation script and not part of using the skills. Tests and evals are not installed.
+3. **Where Trail of Bits workflows write and read:** `audit-context.js` writes `audit-context/` into the working directory unless you pass `outDir`; `variants.js` falls back to listing directory names under your home folder; the `differential-review` skill may write reports to the working directory, the Desktop, or `~/.claude/skills/...`. The workflows themselves are not installed.
+4. **`insecure-defaults` quotes matching lines into model context and its report** when run as its workflow. Only its reference documents are installed.
 5. **Tool breadth in front matter:** the `differential-review` and `fp-check` skills declare Write and Bash (and Edit for `fp-check`) in `allowed-tools`. The agent trims in the lock file do not change what the skills themselves may do.
-6. **Curated skills give unpinned install instructions:** 6 pipe-to-shell lines in 4 skills (the kit's shell guard blocks these in enforce mode), and 20 `@latest`, 33 `pip install`, 13 `uvx`, and 8 `go install ...@` commands. Use the vendor's verified install method and pin versions, as `security-kb/core/dependency-supply-chain.md` advises.
-7. **Curated skills mention files that are not installed.** `scripts/` is removed, so about 19 skills point at scripts that are absent. Treat those mentions as descriptions only.
-8. **Quality varies:** six curated crypto skills are short generic outlines of 3 to 4 KB.
-9. **`09-web-security` is offensive reference material** (SQL injection, XSS, template injection, command injection, SSRF, and JWT attack payloads) under authorization notices. Use it only for authorised testing, which this kit treats as tier 3.
 
-## Changes applied after fetching
+## Changes applied after download
 
-- Trail of Bits `fp-check`: the `hooks/` directory is removed, so its Stop-hook prompts are not installed.
-- Trail of Bits `differential-review` agent `adversarial-modeler` and `fp-check` agent `poc-builder`: the `tools` line is replaced by `Read, Grep, Glob`.
-- Trail of Bits: the `tests/` and `evals/` folders of `audit-context-building`, `insecure-defaults`, and `variant-analysis` are removed.
+- Trail of Bits: only skill folders, six agent files, and the `insecure-defaults` reference documents are installed. Plugin manifests, commands, workflow scripts, hooks, tests, and evals are not installed, and each skill's `agents/` folder (an `openai.yaml` for another tool) is removed.
+- Trail of Bits agents `adversarial-modeler` and `poc-builder`: the `tools` line is replaced by `Read, Grep, Glob`.
+- Trail of Bits text patches (all in `third-party/lock.json`, each must match exactly once or the install falls back to the reviewed commit): namespaced agent names become bare names; the workflow-only routing in `audit-context-building` and `variant-analysis` becomes manual steps that need a plan table and a yes before subagents launch; `Workflow` is removed from the `audit-context-building` allowed tools; `{baseDir}` in one agent becomes a user path; `fp-check` no longer refers to "the plugin's" agents.
 - Cloudflare: the two `*.test.cjs` files are removed.
-- Curated mukul975 and Masriyan skills: each `scripts/` directory is removed; only instruction files and references are kept.
 
-After these changes the third-party executable code that ships is: Cloudflare's two validators and Trail of Bits' three workflow scripts.
+After these changes the third-party executable code that ships is Cloudflare's two validators. Trail of Bits workflow scripts are not installed.
+
+## Reviewed and not installed
+
+Two further repositories were reviewed and are **not** installed: `mukul975/Anthropic-Cybersecurity-Skills` (Apache-2.0) and `Masriyan/Claude-Code-CyberSecurity-Skill` (MIT). Their topics were used as input for six documents written from scratch in `security-kb/core/` (CI security tooling, SBOMs and dependency scanning, container hardening, LLM and agent security, privacy requests, cryptography implementation); no text was copied. The review found no malicious content, but their skills carry unpinned install commands (including download-into-shell lines) and offensive reference material, which is why they are not shipped.
 
 ## Licence notes
 
-- Trail of Bits material is CC-BY-SA-4.0. Private use is unaffected. If you redistribute adapted text, share-alike and attribution apply. The patched copies are adaptations.
-- Apache-2.0 requires keeping the licence and any notices when you redistribute. Each fetched mukul975 skill keeps its own `LICENSE` file.
-- The Masriyan project asks that copies keep its copyright notice, `LICENSE`, and `NOTICE`. Do not redistribute fetched files without them.
-- Windows Defender flagged one script in the Masriyan repository as malware earlier in this project (payload templates for security testing). Scripts are excluded here. The remaining `examples/` files were pattern-scanned with no findings.
+- Trail of Bits material is CC-BY-SA-4.0. Private use is unaffected. If you redistribute the installed copies, share-alike and attribution apply, and the patched copies are adaptations. This repository contains none of its text.
+- MIT sources (Cloudflare, OWASP) keep their licence files inside the installed folders.
+- Windows Defender flagged one script in the Masriyan repository as malware earlier in this project (payload templates for security testing). It is not installed.
 
 ## Not copied
 
-Microsoft Learn and OWASP pages are cited by link in the reference documents. No text is copied from them.
+Microsoft Learn, OWASP, NIST, and regulator pages are cited by link in the reference documents. No text is copied from them.

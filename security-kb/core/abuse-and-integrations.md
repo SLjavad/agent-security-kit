@@ -41,6 +41,15 @@ Data from suppliers and partners is input. Validate type, range, length, and enc
 ## Reverse proxies and forwarded headers
 Behind a reverse proxy, trust `X-Forwarded-*` style headers only from that proxy. If the server is directly exposed, do not process them: any client could spoof its address, scheme, and host.
 
+## API keys, schema validation, and per-client limits
+- **API keys identify a client, they do not authenticate a person.** Store only a hash of each key, show it once at creation, give each key an owner, scopes, an expiry, and a last-used time, and support rotation with an overlap period. Never accept keys in URLs, where logs and referrers record them.
+- **Prefer short-lived tokens for user-facing access** and keep long-lived keys for server-to-server use with narrow scopes.
+- **Validate every request against a schema** that rejects unknown fields, wrong types, oversize strings and arrays, and out-of-range numbers before any business code runs. Reject, do not silently coerce.
+- **Limit per client, per user, and per tenant,** not only per address: addresses are shared by many users and rotated by attackers. Add stricter limits on expensive operations and on authentication, password reset, and code-sending endpoints.
+- **Return a clear throttling response** with a retry hint, and do not let a rate-limit bypass exist on any path (alternate versions, batch endpoints, GraphQL aliases, websocket messages).
+- **Cap pagination and batch sizes,** and the depth and cost of queries a client may compose.
+- **Revoke on compromise:** you must be able to disable one key or client immediately without redeploying.
+
 ## Checklist
 - [ ] Global and per-endpoint rate limits, with stricter limits on authentication and expensive routes
 - [ ] Body size, header, and timeout limits reviewed for the deployment topology

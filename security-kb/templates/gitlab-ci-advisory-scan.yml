@@ -1,0 +1,36 @@
+# Dependency advisory scan for merge requests that change dependency files, plus a manual run. Not scheduled.
+# Tested with osv-scanner v2.7.0: exit 1 is findings, 128 is nothing to scan; both fail the job so an unscanned project is visible.
+advisory-scan:
+  stage: test
+  image:
+    name: ghcr.io/google/osv-scanner:v2.7.0@sha256:4f3b7e2c64b9d38a5febc5a7e4a3dfef1d1362f726dea7a2ef4762b46469fcd0
+    entrypoint: [""]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - "**/package-lock.json"
+        - "**/yarn.lock"
+        - "**/pnpm-lock.yaml"
+        - "**/composer.lock"
+        - "**/poetry.lock"
+        - "**/Pipfile.lock"
+        - "**/requirements*.txt"
+        - "**/go.sum"
+        - "**/Cargo.lock"
+        - "**/Gemfile.lock"
+        - "**/pom.xml"
+        - "**/packages.lock.json"
+        - "**/packages.config"
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
+  script:
+    - |
+      rc=0
+      /osv-scanner scan source -r --format json --output-file osv-results.json . || rc=$?
+      if [ "$rc" -eq 128 ]; then echo "No scannable packages found: the dependency files were not recognised."; fi
+      exit "$rc"
+  artifacts:
+    when: always
+    expire_in: 7 days
+    paths:
+      - osv-results.json

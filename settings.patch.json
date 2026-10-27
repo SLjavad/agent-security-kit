@@ -10,7 +10,7 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["__KIT_DIR__/hooks/security/guard-bash.cjs"],
+            "args": ["__KIT_DIR__/hooks/security-kit/guard-bash.cjs"],
             "timeout": 10
           }
         ]
@@ -21,7 +21,7 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["__KIT_DIR__/hooks/security/scan-write.cjs"],
+            "args": ["__KIT_DIR__/hooks/security-kit/scan-write.cjs"],
             "timeout": 10
           }
         ]
@@ -34,7 +34,7 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["__KIT_DIR__/hooks/security/post-edit-scan.cjs"],
+            "args": ["__KIT_DIR__/hooks/security-kit/post-edit-scan.cjs"],
             "timeout": 15
           }
         ]

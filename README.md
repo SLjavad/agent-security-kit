@@ -1,6 +1,6 @@
 # agent-security-kit
 
-A generic, project-independent and framework-independent security kit: a router skill, a read-only reviewer agent, a reference library, deterministic hooks, templates, and tools that fetch well-known third-party security skills at pinned commits. It contains no facts about any particular project or organisation. Project specifics go in a private `.claude/security-context.md` per project (template included).
+A generic, project-independent and framework-independent security kit: a router skill, a read-only reviewer agent, a reference library, deterministic hooks, templates, and and tools that install well-known third-party security skills after an automatic safety check. It contains no facts about any particular project or organisation. Project specifics go in a private `.claude/security-context.md` per project (template included).
 
 Status: early release. Built for Claude Code skills, agents, and hooks; the reference library is plain Markdown that any agent or person can read. Only the `dotnet` stack is written so far, and the kit has not yet been tested against live Claude Code sessions beyond the included unit tests. Installation is one command with a `--dry-run` preview, conflict checks, backups, and an uninstaller (see below).
 
@@ -8,18 +8,18 @@ Status: early release. Built for Claude Code skills, agents, and hooks; the refe
 
 | Path | Purpose |
 |---|---|
-| `skills/security/` | Router skill: tiers, `/security quick`, `/security pr`, `/security audit`, `/security deep` |
+| `skills/security-kit/` | Router skill: tiers, `/security-kit quick`, `/security-kit pr`, `/security-kit audit`, `/security-kit deep` |
 | `agents/security-reviewer.md` | Read-only reviewer (Read, Grep, Glob) |
-| `security-kb/core/` | 14 framework-neutral reference documents (see `security-kb/INDEX.md`) |
+| `security-kb/core/` | 21 framework-neutral reference documents, including CI tooling, SBOMs, containers, LLM applications, privacy requests, cryptography implementation, and recent-advisory checks (see `security-kb/INDEX.md`) |
 | `security-kb/stacks/` | One folder per language or framework with its specific notes, hook rules, and templates. `dotnet/` is complete; `_template/` and `stacks/README.md` explain how to add another |
 | `security-kb/templates/` | Framework-neutral templates: project context, secret scanning configuration, CI secret-scan job |
-| `hooks/security/` | Zero-dependency Node hooks: shell guard, secret scan before writes, post-edit scan; core rules plus any `stacks/*/hook-rules.json`; tests included |
+| `hooks/security-kit/` | Zero-dependency Node hooks: shell guard, secret scan before writes, post-edit scan; core rules plus any `stacks/*/hook-rules.json`; tests included |
 | `settings.patch.json` | Hook entries and `SECURITY_HOOKS_MODE=warn`, merged additively by `tools/merge-settings.cjs` |
 | `tools/install.cjs` | Installer and uninstaller: `--dry-run` preview, conflict-safe, rollback on failure, manifest, smoke test |
-| `tools/fetch-third-party.cjs` | Fetches third-party skills at pinned SHAs and applies recorded trims |
+| `tools/fetch-third-party.cjs` | Fetches third-party skills at the latest upstream commit that passes the automatic check (else the reviewed commit) and applies recorded trims and patches |
 | `tools/merge-settings.cjs` | Dry-run-first merge and removal of the hook entries, with backup |
 | `tools/prepublish-scan.cjs` | Scans this folder for secrets, personal paths, emails, internal hosts, and your own terms |
-| `third-party/lock.json` | Pinned sources, licences, review state, patches |
+| `third-party/lock.json` | Sources, licences, the reviewed commit of each, review state, trims, patches |
 | `THIRD_PARTY.md` | Sources, licences, and what is changed |
 
 ## Tiers
@@ -27,8 +27,8 @@ Status: early release. Built for Claude Code skills, agents, and hooks; the refe
 | Tier | When | Method |
 |---|---|---|
 | 0 | Always | Hooks, analyzers, NuGet audit |
-| 1 | Every PR | `differential-review`, `owasp-security`, built-in `/security-review`, `security-reviewer` |
-| 2 | Release or quarterly, explicit request only | `security-audit`, scoped by the project context |
+| 1 | Every PR, and `/security-kit advisories` for recent CVEs and advisories affecting the project (live lookups after you approve the list of component names and versions sent) | `differential-review`, `owasp-security`, built-in `/security-review`, `security-reviewer` |
+| 2 | Release or quarterly, explicit request only | `security-audit` (its validators need WSL, Linux, or macOS; they cannot run on native Windows), scoped by the project context |
 | 3 | Only when triggered, explicit request only | Deep profile, native code, fuzzing, pentest preparation |
 
 Tiers 2 and 3 never start on their own, and any subagent launch needs the user's approval after a plan table.
@@ -43,13 +43,13 @@ Runs the hook, fetcher, scanner, settings-merge, and kit-lint tests. The lint te
 
 ## Hooks
 
-Hooks start in warn mode: they log the rule name and file name to `~/.claude/hooks/security/logs/findings.jsonl` and never block. They never record matched text. Switch to blocking by setting `SECURITY_HOOKS_MODE` to `enforce` in the settings `env` block. In enforce mode the pre-tool hooks exit with code 2 (blocking, with the reason on stderr) and the post-edit hook exits 2 to show its findings to Claude after the edit.
+Hooks start in warn mode: they log findings and never block. Each project gets its own log, `~/.claude/hooks/security-kit/logs/<project-name>-<short-id>/findings.jsonl`. The project is the nearest parent folder containing `.git` (else the working directory), and the short id is a hash of its full path, so two projects with the same folder name stay apart; findings with no working directory go to `_unknown`. A line holds only the time, the hook, the rule name, and the file's base name, never matched text or paths. A log is renamed to `findings.1.jsonl` when it reaches 1 MB (one backup is kept, so a project uses at most about 2 MB). `SECURITY_HOOKS_LOG_DIR` moves the whole logs folder and `SECURITY_HOOKS_LOG_MAX_BYTES` changes the size limit. Switch to blocking by setting `SECURITY_HOOKS_MODE` to `enforce` in the settings `env` block. In enforce mode the pre-tool hooks exit with code 2 (blocking, with the reason on stderr) and the post-edit hook exits 2 to show its findings to Claude after the edit.
 
 Not included yet: a gitleaks call inside the post-edit hook. gitleaks documents `gitleaks dir <path>` and `--redact`; add and test it after you install the tool.
 
 ## Installing
 
-The installer is `tools/install.cjs`. It needs Node 18 or newer and git (only for third-party fetching). Running it installs the kit. Add **`--dry-run`** to preview first: it prints every file it would create, update, or leave alone, the settings entries it would add, and any conflicts, and it changes nothing.
+The installer is `tools/install.cjs`. It needs Node 18 or newer, git, and network access to GitHub for the third-party skills (use `--offline` to skip them). Running it installs the whole kit: there are no optional parts to forget. Add **`--dry-run`** to preview first: it prints every file it would create, update, or leave alone, the settings entries it would add, and any conflicts, and it changes nothing.
 
 Preview:
 
@@ -66,6 +66,7 @@ node tools/install.cjs
 What a real install does:
 
 - Copies the router skill, reviewer agent, `security-kb/`, and the hooks (without tests or logs) into `~/.claude`.
+- Fetches the third-party skills listed in `third-party/lock.json` (security audit, OWASP, and the Trail of Bits review skills and agents) into `~/.claude/skills`, `agents`, and `security-kb/third-party`. See "Third-party versions" below.
 - Merges the hook entries and `SECURITY_HOOKS_MODE` into `~/.claude/settings.json`, keeping everything already there and writing a `settings.json.bak-<time>` backup first.
 - Records every installed file with its hash in `~/.claude/.agent-security-kit-manifest.json`.
 - Runs a smoke test against the installed hooks and reports each check.
@@ -85,17 +86,27 @@ Options:
 | `--hooks-mode warn|enforce` | Hook mode written to settings (default `warn`) |
 | `--node-command <path>` | Command used to start the hooks, for example an absolute path to node (default `node`) |
 | `--no-settings` | Copy files only; do not touch `settings.json` |
-| `--with-third-party` | Also fetch the reviewed third-party skills at pinned commits into `skills/` (needs network and git) |
-| `--with-curated` | With third-party: also fetch the optional curated reference skills (30 from mukul975, 4 from Masriyan). Read `THIRD_PARTY.md` first: they contain unpinned install commands and offensive reference material |
-| `--include-unreviewed` | With third-party: also fetch sources whose review state is `none` (currently there are none) |
-| `--with-plugin-files` | With third-party: also fetch the Trail of Bits plugin folders into `plugins-local/`. Activating a plugin is a manual step; confirm the install command for your Claude Code version first |
+| `--offline` | Skip the third-party downloads (install the kit's own files only) |
+| `--pin-reviewed` | Install the exact commits that were reviewed instead of the latest upstream commit |
 | `--verbose` | List every file |
 | `--force` | Replace conflicting files after backing them up |
 | `--no-smoke-test` | Skip the post-install checks |
 
 Exit codes: 0 success, 1 error or failed smoke test, 2 conflicts (nothing changed).
 
-After installing, restart Claude Code sessions. Review `~/.claude/hooks/security/logs/findings.jsonl` for a few days before choosing `enforce`.
+The old `--with-third-party`, `--with-plugin-files`, `--with-curated`, and `--include-unreviewed` options were removed on purpose; the installer refuses them with a message.
+
+### Third-party versions
+
+None of the three upstream repositories publishes tags or releases, so "latest" means the head of its default branch. Installing whatever is there unchecked would let an upstream change alter your agent's instructions after you reviewed it, so the installer compares the head with the commit that was reviewed (`reviewedSha` in `third-party/lock.json`):
+
+1. Head equals the reviewed commit: installed as is.
+2. Head is newer: the installer fetches both and looks only at files under the installed paths (files the lock removes are ignored). The newer commit is installed only if every changed file is plain documentation (`.md`, `.mdx`, `.txt`, `.json`), nothing became executable or a symbolic link, the added lines contain no hidden Unicode, download-into-shell, instruction-override phrases, long encoded blobs, or changed `tools`/`allowed-tools`/`hooks` declarations, and every text patch in the lock still applies.
+3. Anything else: the reviewed commit is installed and the dry run and the install output say why.
+
+The dry run shows the decision for each source (`reviewed`, `latest`, or `reviewed-fallback`) before anything is written, and the manifest records the installed commit and the reviewed commit. The automatic check is not a review: a newer documentation change can still be wrong in ways a pattern check cannot see. Use `--pin-reviewed` for exactly the reviewed commits.
+
+After installing, restart Claude Code sessions. Review the project logs under `~/.claude/hooks/security-kit/logs/` for a few days before choosing `enforce`.
 
 ### Uninstalling
 

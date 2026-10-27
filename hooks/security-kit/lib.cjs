@@ -1,6 +1,7 @@
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
+const crypto = require('crypto')
 
 const patterns = JSON.parse(fs.readFileSync(path.join(__dirname, 'patterns.json'), 'utf8'))
 
@@ -57,9 +58,13 @@ const compiled = {
 
 const mode = () => (String(process.env.SECURITY_HOOKS_MODE || 'warn').toLowerCase() === 'enforce' ? 'enforce' : 'warn')
 
+let projectDir = null
+
 const readInput = () => {
   try {
-    return JSON.parse(fs.readFileSync(0, 'utf8'))
+    const input = JSON.parse(fs.readFileSync(0, 'utf8'))
+    if (input && typeof input.cwd === 'string') projectDir = input.cwd
+    return input
   } catch {
     return null
   }
@@ -87,12 +92,42 @@ const driftMatches = (rule, file, text) => {
 
 const scanDrift = (file, text) => compiled.configDrift.filter((r) => driftMatches(r, file, text)).map((r) => r.id)
 
-const logDir = () => process.env.SECURITY_HOOKS_LOG_DIR || path.join(os.homedir(), '.claude', 'hooks', 'security', 'logs')
+const logRoot = () => process.env.SECURITY_HOOKS_LOG_DIR || path.join(os.homedir(), '.claude', 'hooks', 'security-kit', 'logs')
+
+const maxLogBytes = () => Number(process.env.SECURITY_HOOKS_LOG_MAX_BYTES) || 1024 * 1024
+
+const projectRoot = (start) => {
+  let dir = path.resolve(start)
+  for (;;) {
+    if (fs.existsSync(path.join(dir, '.git'))) return dir
+    const parent = path.dirname(dir)
+    if (parent === dir) return path.resolve(start)
+    dir = parent
+  }
+}
+
+const projectKey = (cwd) => {
+  if (!cwd) return '_unknown'
+  const root = projectRoot(cwd)
+  const identity = process.platform === 'win32' ? root.toLowerCase() : root
+  const name = path.basename(root).replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 40) || 'project'
+  return `${name}-${crypto.createHash('sha256').update(identity).digest('hex').slice(0, 8)}`
+}
+
+const rotate = (file) => {
+  if (fs.statSync(file).size < maxLogBytes()) return
+  const backup = file.replace(/\.jsonl$/, '.1.jsonl')
+  fs.rmSync(backup, { force: true })
+  fs.renameSync(file, backup)
+}
 
 const logFinding = (hook, rule, target) => {
   try {
-    fs.mkdirSync(logDir(), { recursive: true })
-    fs.appendFileSync(path.join(logDir(), 'findings.jsonl'), JSON.stringify({ t: new Date().toISOString(), hook, rule, target }) + '\n')
+    const dir = path.join(logRoot(), projectKey(projectDir))
+    const file = path.join(dir, 'findings.jsonl')
+    fs.mkdirSync(dir, { recursive: true })
+    if (fs.existsSync(file)) rotate(file)
+    fs.appendFileSync(file, JSON.stringify({ t: new Date().toISOString(), hook, rule, target }) + '\n')
   } catch {
     return
   }
@@ -106,4 +141,4 @@ const report = (hook, ids, target, verb = 'blocked') => {
   return 2
 }
 
-module.exports = { compiled, mode, readInput, collectStrings, isExcludedPath, scan, scanDrift, report }
+module.exports = { compiled, mode, readInput, collectStrings, isExcludedPath, scan, scanDrift, report, projectKey }

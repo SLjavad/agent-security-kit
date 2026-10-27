@@ -24,6 +24,13 @@ Broken object-level authorization is among the most common serious API flaws: th
 - Background jobs and message consumers have no HTTP user. Check how they establish tenant context and that it cannot leak between messages.
 - Caches: include the tenant or user in the cache key whenever content differs by caller.
 
+## Property-level authorization
+Object-level checks answer "may this user see this record". They do not answer "may this user see or change **this field**".
+- **Output:** return an explicit allow-list of fields per role. Do not serialise the stored entity and hope sensitive fields are hidden; fields added later leak by default.
+- **Input (mass assignment):** bind requests to a dedicated input shape that lists only the fields the caller may set. Never bind straight onto the stored entity, or a caller can set role, owner, tenant, price, status, or approval flags.
+- **Sensitive fields need their own rule:** role and permission changes, ownership transfer, tenant ID, price or discount, verified or approved state, and balances change only through dedicated operations with their own authorization and audit.
+- **Test it:** send extra fields in create and update requests and assert they are ignored or rejected; compare the fields returned to a low-privilege user against the allow-list.
+
 ## Tests worth requiring
 - Two tenants, two users: user A requests user B's record by id on every endpoint and expects 403 or 404.
 - A list endpoint returns only the caller's rows.

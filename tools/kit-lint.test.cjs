@@ -17,7 +17,7 @@ const STACK_VOCABULARY = [/\.NET\b/, /\bNuGet\b/i, /ASP\.NET/, /EF Core|Entity F
 
 const neutralFiles = () => [
   ...coreDocs.map((d) => path.join(coreDir, `${d}.md`)),
-  path.join(root, 'skills', 'security', 'SKILL.md'),
+  path.join(root, 'skills', 'security-kit', 'SKILL.md'),
   path.join(root, 'agents', 'security-reviewer.md'),
   path.join(kb, 'INDEX.md'),
   ...fs.readdirSync(path.join(kb, 'templates')).map((f) => path.join(kb, 'templates', f))
@@ -61,6 +61,7 @@ test('each stack folder satisfies the contract', () => {
     assert.ok(Array.isArray(meta.detect) && meta.detect.length > 0 && meta.detect.every((d) => typeof d === 'string'), `${id}: detect`)
     assert.match(meta.verified, /^\d{4}-\d{2}$/, `${id}: verified`)
     assert.ok(Array.isArray(meta.authoritativeSources), `${id}: authoritativeSources`)
+    for (const s of meta.advisorySources || []) assert.ok(typeof s.name === 'string' && /^https:\/\//.test(s.url), `${id}: advisorySources entries need name and an https url`)
     assert.ok(Array.isArray(meta.docs) && meta.docs.length > 0, `${id}: docs`)
     for (const doc of meta.docs) {
       assert.ok(coreDocs.includes(doc), `${id}: ${doc} has no core document`)
@@ -89,14 +90,48 @@ test('stack hook rules are well formed and compile', () => {
 
 test('the stack template is present and the router explains stack detection', () => {
   assert.ok(fs.existsSync(path.join(stacksDir, '_template', 'stack.json')))
-  const router = read(root, 'skills', 'security', 'SKILL.md')
+  const router = read(root, 'skills', 'security-kit', 'SKILL.md')
   assert.match(router, /stack\.json/)
   assert.match(router, /detect/)
 })
 
+test('the advisories command is wired: router, core document, stack sources, and no scheduled trigger', () => {
+  const router = read(root, 'skills', 'security-kit', 'SKILL.md')
+  assert.match(router, /\/security-kit advisories/)
+  assert.match(router, /core\/advisory-checks\.md/)
+  assert.ok(coreDocs.includes('advisory-checks'))
+  assert.ok(stacks.every((id) => JSON.parse(read(stacksDir, id, 'stack.json')).advisorySources !== undefined), 'every stack declares advisorySources')
+  const template = read(kb, 'templates', 'gitlab-ci-advisory-scan.yml')
+  assert.ok(!/\$CI_PIPELINE_SOURCE == "schedule"/.test(template))
+})
+
+test('advisory scan templates pin the scanner image, call its real binary path, and cover .NET dependency files', () => {
+  const generic = read(kb, 'templates', 'gitlab-ci-advisory-scan.yml')
+  const dotnet = read(stacksDir, 'dotnet', 'templates', 'gitlab-ci-advisory-scan.yml')
+  for (const template of [generic, dotnet]) {
+    assert.match(template, /ghcr\.io\/google\/osv-scanner:v\d+\.\d+\.\d+@sha256:[0-9a-f]{64}/)
+    assert.ok(!/REPLACE-WITH/.test(template))
+    assert.match(template, /^\s+- \/osv-scanner scan|^\s+\/osv-scanner scan/m)
+    assert.ok(!/^\s+(- )?osv-scanner /m.test(template), 'the binary is not on PATH once the entrypoint is cleared')
+    assert.match(template, /-eq 128/)
+  }
+  for (const glob of ['**/packages.lock.json', '**/packages.config']) assert.ok(generic.includes(glob), `generic template misses ${glob}`)
+  for (const glob of ['**/packages.lock.json', '**/*.csproj', '**/Directory.Packages.props']) assert.ok(dotnet.includes(glob), `dotnet template misses ${glob}`)
+  assert.ok(!/\$CI_PIPELINE_SOURCE == "schedule"/.test(dotnet))
+})
+
+test('the skill and hooks folders are named security-kit, and the logs live under the same name', () => {
+  const skill = read(root, 'skills', 'security-kit', 'SKILL.md')
+  assert.match(skill, /^---\r?\nname: security-kit\r?\n/)
+  assert.ok(!fs.existsSync(path.join(root, 'skills', 'security')) && !fs.existsSync(path.join(root, 'hooks', 'security')))
+  assert.ok(fs.existsSync(path.join(root, 'hooks', 'security-kit', 'lib.cjs')))
+  assert.match(read(root, 'hooks', 'security-kit', 'lib.cjs'), /'hooks', 'security-kit', 'logs'/)
+  assert.ok(!/\/security (quick|pr|advisories|audit|deep)/.test(skill), 'commands use the /security-kit prefix')
+})
+
 test('settings patch points at hook scripts that exist', () => {
   const patch = JSON.parse(read(root, 'settings.patch.json'))
-  const scripts = JSON.stringify(patch).match(/__KIT_DIR__\/hooks\/security\/[\w.-]+\.cjs/g) || []
+  const scripts = JSON.stringify(patch).match(/__KIT_DIR__\/hooks\/security-kit\/[\w.-]+\.cjs/g) || []
   assert.ok(scripts.length >= 3)
   for (const s of scripts) assert.ok(fs.existsSync(path.join(root, s.replace('__KIT_DIR__/', ''))), s)
 })

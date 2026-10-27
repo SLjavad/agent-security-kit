@@ -8,6 +8,7 @@ The documents in `core/` are independent of language and framework. Everything t
 2. For a topic, read `core/<topic>.md` first, then `stacks/<id>/<topic>.md` for every detected stack, if that file exists.
 3. The stack's `hook-rules.json` adds deterministic checks to the post-edit hook automatically.
 4. A stack may list authoritative sources in `stack.json` (for example a vendor documentation server). Use them for facts about that stack, and name the version.
+5. A stack may list `advisorySources` in `stack.json`: where that stack's runtime, framework, and package advisories are published. `/security-kit advisories` consults them (see `core/advisory-checks.md`).
 
 A project can match several stacks (for example a .NET API and a Node front end). Use all that match.
 
@@ -15,7 +16,7 @@ A project can match several stacks (for example a .NET API and a Node front end)
 
 ```
 stacks/<id>/
-  stack.json          required: id, name, detect, authoritativeSources, verified, docs
+  stack.json          required: id, name, detect, authoritativeSources, verified, docs; optional: advisorySources (list of { name, url }), templates
   README.md           optional: scope, versions covered, how it was researched
   <topic>.md          one per topic in `docs`; the file name equals a file in core/
   hook-rules.json     optional: extra configDrift rules (see below)

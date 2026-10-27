@@ -21,9 +21,15 @@ const newClaudeDir = (settings) => {
 }
 
 const install = (kit, claudeDir, ...args) => {
-  const r = spawnSync(process.execPath, [path.join(kit, 'tools', 'install.cjs'), '--claude-dir', claudeDir, ...args], { encoding: 'utf8' })
+  const withNetwork = args.includes('--network')
+  const rest = args.filter((a) => a !== '--network')
+  const extra = withNetwork || rest.includes('--pin-reviewed') ? [] : ['--offline']
+  const r = spawnSync(process.execPath, [path.join(kit, 'tools', 'install.cjs'), '--claude-dir', claudeDir, ...rest, ...extra], { encoding: 'utf8' })
   return { code: r.status, out: r.stdout, err: r.stderr }
 }
+
+const online = spawnSync('git', ['ls-remote', 'https://github.com/agamm/claude-code-owasp.git', 'HEAD'], { encoding: 'utf8', timeout: 30000 }).status === 0
+const needsNetwork = online ? {} : { skip: 'GitHub is not reachable' }
 
 const snapshot = (dir) => {
   const out = {}
@@ -64,19 +70,19 @@ test('apply installs files, merges settings, writes a manifest, and the smoke te
   assert.match(r.out, /smoke test ok\s+shell guard blocks pipe-to-shell/)
   assert.ok(!/FAIL/.test(r.out))
   const files = snapshot(claude)
-  for (const rel of ['skills/security/SKILL.md', 'agents/security-reviewer.md', 'security-kb/INDEX.md', 'security-kb/core/dependency-supply-chain.md', 'security-kb/stacks/dotnet/stack.json', 'hooks/security/guard-bash.cjs', 'hooks/security/lib.cjs', 'hooks/security/patterns.json']) {
+  for (const rel of ['skills/security-kit/SKILL.md', 'agents/security-reviewer.md', 'security-kb/INDEX.md', 'security-kb/core/dependency-supply-chain.md', 'security-kb/stacks/dotnet/stack.json', 'hooks/security-kit/guard-bash.cjs', 'hooks/security-kit/lib.cjs', 'hooks/security-kit/patterns.json']) {
     assert.ok(rel in files, rel)
   }
   assert.ok(!Object.keys(files).some((f) => f.endsWith('.test.cjs')))
-  assert.ok(!Object.keys(files).some((f) => f.startsWith('hooks/security/logs')))
+  assert.ok(!Object.keys(files).some((f) => f.startsWith('hooks/security-kit/logs')))
   const settings = JSON.parse(files['settings.json'])
   assert.deepStrictEqual(settings.permissions, existingSettings().permissions)
   assert.strictEqual(settings.hooks.PreToolUse.length, 3)
   assert.strictEqual(settings.env.SECURITY_HOOKS_MODE, 'warn')
-  assert.ok(JSON.stringify(settings).includes(claude.replace(/\\/g, '/') + '/hooks/security/guard-bash.cjs'))
+  assert.ok(JSON.stringify(settings).includes(claude.replace(/\\/g, '/') + '/hooks/security-kit/guard-bash.cjs'))
   const manifest = JSON.parse(files['.agent-security-kit-manifest.json'])
   assert.strictEqual(manifest.kit, 'agent-security-kit')
-  assert.ok(manifest.files['skills/security/SKILL.md'])
+  assert.ok(manifest.files['skills/security-kit/SKILL.md'])
   assert.ok(Object.keys(fs.readdirSync(claude)).length > 0)
   assert.ok(fs.readdirSync(claude).some((f) => f.startsWith('settings.json.bak-')))
 })
@@ -94,12 +100,12 @@ test('apply is idempotent', () => {
 
 test('a file you already own is a conflict, nothing is written, and --force backs it up', () => {
   const claude = newClaudeDir()
-  fs.mkdirSync(path.join(claude, 'skills', 'security'), { recursive: true })
-  fs.writeFileSync(path.join(claude, 'skills', 'security', 'SKILL.md'), 'my own skill')
+  fs.mkdirSync(path.join(claude, 'skills', 'security-kit'), { recursive: true })
+  fs.writeFileSync(path.join(claude, 'skills', 'security-kit', 'SKILL.md'), 'my own skill')
   const before = snapshot(claude)
   const dry = install(sharedKit, claude, '--dry-run')
   assert.strictEqual(dry.code, 2)
-  assert.match(dry.out, /conflict\s+skills\/security\/SKILL\.md/)
+  assert.match(dry.out, /conflict\s+skills\/security-kit\/SKILL\.md/)
   const refused = install(sharedKit, claude)
   assert.strictEqual(refused.code, 2)
   assert.deepStrictEqual(snapshot(claude), before)
@@ -107,7 +113,7 @@ test('a file you already own is a conflict, nothing is written, and --force back
   assert.strictEqual(forced.code, 0, forced.out + forced.err)
   const backups = fs.readdirSync(claude).filter((f) => f.startsWith('.agent-security-kit-backup-'))
   assert.strictEqual(backups.length, 1)
-  assert.strictEqual(fs.readFileSync(path.join(claude, backups[0], 'skills', 'security', 'SKILL.md'), 'utf8'), 'my own skill')
+  assert.strictEqual(fs.readFileSync(path.join(claude, backups[0], 'skills', 'security-kit', 'SKILL.md'), 'utf8'), 'my own skill')
 })
 
 test('updating from a newer kit replaces unmodified files and protects local edits', () => {
@@ -124,6 +130,40 @@ test('updating from a newer kit replaces unmodified files and protects local edi
   const protectedRun = install(kit, claude)
   assert.strictEqual(protectedRun.code, 2)
   assert.match(fs.readFileSync(path.join(claude, 'security-kb', 'core', 'patching-cadence.md'), 'utf8'), /my local note/)
+})
+
+test('an install made under the old security names is migrated: old files and hook entries go, the old log stays', () => {
+  const kit = copyKit()
+  const claude = newClaudeDir()
+  const sha = (file) => require('crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex')
+  const files = {}
+  const legacy = (fromDir, toDir) => {
+    for (const name of fs.readdirSync(path.join(kit, fromDir)).filter((n) => !/\.test\.cjs$/.test(n))) {
+      const dest = path.join(claude, toDir, name)
+      fs.mkdirSync(path.dirname(dest), { recursive: true })
+      fs.copyFileSync(path.join(kit, fromDir, name), dest)
+      files[`${toDir}/${name}`] = sha(dest)
+    }
+  }
+  legacy('hooks/security-kit', 'hooks/security')
+  legacy('skills/security-kit', 'skills/security')
+  fs.mkdirSync(path.join(claude, 'hooks', 'security', 'logs'), { recursive: true })
+  fs.writeFileSync(path.join(claude, 'hooks', 'security', 'logs', 'findings.jsonl'), '{"old":true}\n')
+  fs.writeFileSync(path.join(claude, '.agent-security-kit-manifest.json'), JSON.stringify({ kit: 'agent-security-kit', files, thirdParty: [] }))
+  const patch = JSON.parse(fs.readFileSync(path.join(kit, 'settings.patch.json'), 'utf8').split('__KIT_DIR__').join(claude.replace(/\\/g, '/')).split('hooks/security-kit/').join('hooks/security/'))
+  fs.writeFileSync(path.join(claude, 'settings.json'), JSON.stringify({ env: patch.env, hooks: { ...patch.hooks, PreToolUse: [...patch.hooks.PreToolUse, existingSettings().hooks.PreToolUse[0]] } }, null, 2))
+  const r = install(kit, claude)
+  assert.strictEqual(r.code, 0, r.out + r.err)
+  assert.match(r.out, /migrated 2 entries from hooks\/security to hooks\/security-kit/)
+  assert.ok(!fs.existsSync(path.join(claude, 'skills', 'security')))
+  assert.ok(!fs.existsSync(path.join(claude, 'hooks', 'security', 'guard-bash.cjs')))
+  assert.strictEqual(fs.readFileSync(path.join(claude, 'hooks', 'security', 'logs', 'findings.jsonl'), 'utf8'), '{"old":true}\n')
+  assert.ok(fs.existsSync(path.join(claude, 'hooks', 'security-kit', 'guard-bash.cjs')))
+  const settings = fs.readFileSync(path.join(claude, 'settings.json'), 'utf8')
+  assert.ok(!/hooks\/security\//.test(settings))
+  assert.strictEqual((settings.match(/guard-bash\.cjs/g) || []).length, 1)
+  assert.strictEqual((settings.match(/other\.exe/g) || []).length, 1)
+  assert.strictEqual(install(kit, claude).code, 0)
 })
 
 test('files removed from the kit are removed on update only when unmodified', () => {
@@ -161,8 +201,12 @@ test('invalid input aborts before any write', () => {
   assert.strictEqual(install(sharedKit, path.join(sharedKit, 'sub')).code, 1)
   assert.strictEqual(install(sharedKit, claude, '--bogus').code, 1)
   assert.strictEqual(install(sharedKit, claude, '--hooks-mode', 'loud').code, 1)
-  assert.strictEqual(install(sharedKit, claude, '--with-plugin-files').code, 1)
-  assert.strictEqual(install(sharedKit, claude, '--with-curated').code, 1)
+  for (const removed of ['--with-third-party', '--with-plugin-files', '--with-curated', '--include-unreviewed']) {
+    const r = install(sharedKit, claude, removed)
+    assert.strictEqual(r.code, 1, removed)
+    assert.match(r.err, /was removed: the full reviewed set is always installed/)
+  }
+  assert.strictEqual(install(sharedKit, claude, '--pin-reviewed', '--offline').code, 1)
 })
 
 test('a failure while copying rolls everything back', () => {
@@ -198,7 +242,7 @@ test('uninstall dry run changes nothing; apply removes only kit files and entrie
   assert.strictEqual(done.code, 0, done.out + done.err)
   const after = snapshot(claude)
   assert.strictEqual(after['skills/mine/SKILL.md'], 'mine')
-  assert.ok(!Object.keys(after).some((k) => k.startsWith('security-kb/') || k.startsWith('hooks/security/') || k.startsWith('skills/security/') || k.startsWith('agents/security-reviewer')))
+  assert.ok(!Object.keys(after).some((k) => k.startsWith('security-kb/') || k.startsWith('hooks/security-kit/') || k.startsWith('skills/security-kit/') || k.startsWith('agents/security-reviewer')))
   assert.ok(!('.agent-security-kit-manifest.json' in after))
   assert.deepStrictEqual(JSON.parse(after['settings.json']), existingSettings())
 })
@@ -223,31 +267,74 @@ test('uninstall without a manifest does nothing', () => {
   assert.match(r.out, /Nothing to uninstall/)
 })
 
-test('third-party dry run lists the plan from the lock file without network or writes', () => {
+test('--offline skips third-party sources and says how to add them', () => {
+  const claude = newClaudeDir()
+  const r = install(sharedKit, claude)
+  assert.strictEqual(r.code, 0, r.out + r.err)
+  assert.match(r.out, /Third-party: skipped \(--offline\)/)
+  assert.ok(!fs.existsSync(path.join(claude, 'skills', 'security-audit')))
+})
+
+test('the dry run lists the whole reviewed set with its mode and commit, and writes nothing', () => {
   const claude = newClaudeDir()
   const before = snapshot(claude)
-  const r = install(sharedKit, claude, '--with-third-party', '--dry-run')
+  const r = install(sharedKit, claude, '--pin-reviewed', '--dry-run')
   assert.strictEqual(r.code, 0, r.err)
-  assert.match(r.out, /cloudflare-security-audit: skills\/security-audit/)
-  assert.match(r.out, /agamm-owasp: skills\/owasp-security/)
-  assert.match(r.out, /plugin files skipped/)
-  assert.match(r.out, /curated reference skills skipped/)
-  assert.ok(!/mukul975-curated/.test(r.out))
-  assert.ok(!/plugins-local/.test(r.out.replace(/plugin files skipped[^\n]*/, '')))
-  const withAll = install(sharedKit, claude, '--with-third-party', '--with-plugin-files', '--with-curated', '--dry-run')
-  assert.match(withAll.out, /trailofbits-skills: plugins-local\/fp-check/)
-  assert.match(withAll.out, /mukul975-curated: security-kb\/curated\//)
+  assert.match(r.out, /cloudflare-security-audit \[MIT\]: reviewed [0-9a-f]{12}/)
+  assert.match(r.out, /trailofbits-skills \[CC-BY-SA-4\.0\]: reviewed [0-9a-f]{12}/)
+  for (const p of ['skills/security-audit', 'skills/owasp-security', 'skills/differential-review', 'skills/fp-check', 'agents/adversarial-modeler.md', 'security-kb/third-party/insecure-defaults']) {
+    assert.ok(r.out.includes(p), p)
+  }
+  assert.ok(!/curated|plugins-local/.test(r.out))
   assert.deepStrictEqual(snapshot(claude), before)
 })
 
-test('an existing third-party path is reported as a conflict', () => {
+test('an existing third-party path that this kit does not own is a conflict', () => {
   const claude = newClaudeDir()
   fs.mkdirSync(path.join(claude, 'skills', 'security-audit'), { recursive: true })
   fs.writeFileSync(path.join(claude, 'skills', 'security-audit', 'SKILL.md'), 'mine')
-  const r = install(sharedKit, claude, '--with-third-party', '--dry-run')
+  const r = install(sharedKit, claude, '--pin-reviewed', '--dry-run')
   assert.strictEqual(r.code, 2)
   assert.match(r.out, /already exists/)
   assert.match(r.out, /Conflicts/)
+})
+
+test('a real install fetches the reviewed set, patches it, updates cleanly, and protects edits', needsNetwork, () => {
+  const claude = newClaudeDir(existingSettings())
+  const first = install(sharedKit, claude, '--pin-reviewed')
+  assert.strictEqual(first.code, 0, first.out + first.err)
+  const files = snapshot(claude)
+  for (const rel of ['skills/security-audit/SKILL.md', 'skills/owasp-security/SKILL.md', 'skills/differential-review/SKILL.md', 'skills/sharp-edges/SKILL.md', 'skills/audit-context-building/SKILL.md', 'skills/variant-analysis/SKILL.md', 'skills/fp-check/SKILL.md', 'agents/adversarial-modeler.md', 'agents/poc-builder.md', 'security-kb/third-party/insecure-defaults/weak-crypto.md']) {
+    assert.ok(rel in files, rel)
+  }
+  assert.ok(!Object.keys(files).some((k) => /(^|\/)(hooks\.json|plugin\.json)$/.test(k) || k.includes('/workflows/') || k.includes('/tests/') || k.includes('/evals/')))
+  assert.ok(!Object.keys(files).some((k) => k.endsWith('.test.cjs')))
+  assert.match(files['agents/poc-builder.md'], /^tools: Read, Grep, Glob$/m)
+  assert.ok(!/differential-review:adversarial-modeler/.test(files['skills/differential-review/SKILL.md']))
+  assert.ok(!/^allowed-tools:.*Workflow/m.test(files['skills/audit-context-building/SKILL.md']))
+  const manifest = JSON.parse(files['.agent-security-kit-manifest.json'])
+  assert.strictEqual(manifest.thirdParty.length, 3)
+  for (const tp of manifest.thirdParty) {
+    assert.strictEqual(tp.mode, 'reviewed')
+    assert.strictEqual(tp.sha, tp.reviewedSha)
+    assert.ok(Object.values(tp.hashes).every((h) => /^[0-9a-f]{64}$/.test(h)))
+  }
+
+  const again = install(sharedKit, claude, '--pin-reviewed')
+  assert.strictEqual(again.code, 0, again.out + again.err)
+  assert.match(again.out, /\(update\)/)
+
+  fs.appendFileSync(path.join(claude, 'skills', 'owasp-security', 'SKILL.md'), '\nmy note\n')
+  assert.strictEqual(install(sharedKit, claude, '--pin-reviewed', '--dry-run').code, 2)
+  const kept = install(sharedKit, claude, '--uninstall')
+  assert.strictEqual(kept.code, 0, kept.out + kept.err)
+  assert.match(kept.out, /modified\s+skills\/owasp-security/)
+  assert.ok(fs.existsSync(path.join(claude, 'skills', 'owasp-security', 'SKILL.md')))
+  assert.ok(!fs.existsSync(path.join(claude, 'skills', 'security-audit')))
+  assert.ok(!fs.existsSync(path.join(claude, 'agents', 'adversarial-modeler.md')))
+  const forced = install(sharedKit, claude, '--uninstall', '--force')
+  assert.strictEqual(forced.code, 0)
+  assert.ok(!fs.existsSync(path.join(claude, 'skills', 'owasp-security')))
 })
 
 test('parseArgs defaults to the home .claude directory and a real install', () => {
@@ -264,7 +351,7 @@ test('running with no flags installs, and --dry-run on a second target changes n
   const r = install(sharedKit, claude)
   assert.strictEqual(r.code, 0, r.out + r.err)
   assert.ok(!/DRY RUN/.test(r.out))
-  assert.ok(fs.existsSync(path.join(claude, 'skills', 'security', 'SKILL.md')))
+  assert.ok(fs.existsSync(path.join(claude, 'skills', 'security-kit', 'SKILL.md')))
   const other = newClaudeDir()
   assert.strictEqual(install(sharedKit, other, '--dry-run').code, 0)
   assert.deepStrictEqual(snapshot(other), {})

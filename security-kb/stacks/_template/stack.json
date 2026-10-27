@@ -5,6 +5,9 @@
   "authoritativeSources": [
     { "name": "Source name", "how": "How to consult it" }
   ],
+  "advisorySources": [
+    { "name": "Where the runtime and framework publish security advisories", "url": "https://example.org/advisories" }
+  ],
   "verified": "YYYY-MM",
   "docs": []
 }

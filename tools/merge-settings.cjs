@@ -1,7 +1,8 @@
 const fs = require('fs')
 const path = require('path')
 
-const KIT_PATH = /[\\/]hooks[\\/]security[\\/]/
+const KIT_PATH = /[\\/]hooks[\\/]security(-kit)?[\\/]/
+const LEGACY_KIT_PATH = /[\\/]hooks[\\/]security[\\/]/
 
 const readJson = (file) => {
   const raw = fs.readFileSync(file, 'utf8')
@@ -15,7 +16,11 @@ const readJson = (file) => {
 
 const entryKey = (entry) => `${entry.matcher || ''}|${(entry.hooks || []).map((h) => [h.command, ...(h.args || [])].join(' ')).join(';')}`
 
-const isKitEntry = (entry) => (entry.hooks || []).some((h) => (h.args || []).some((a) => KIT_PATH.test(a)))
+const matchesPath = (entry, re) => (entry.hooks || []).some((h) => (h.args || []).some((a) => re.test(a)))
+
+const isKitEntry = (entry) => matchesPath(entry, KIT_PATH)
+
+const isLegacyEntry = (entry) => matchesPath(entry, LEGACY_KIT_PATH)
 
 const resolvePatch = (patch, kitDir) => JSON.parse(JSON.stringify(patch).split('__KIT_DIR__').join(kitDir.replace(/\\/g, '/')))
 
@@ -31,7 +36,10 @@ const merge = (settings, patch, kitDir) => {
   }
   for (const [event, entries] of Object.entries(resolved.hooks || {})) {
     out.hooks = out.hooks || {}
-    out.hooks[event] = out.hooks[event] || []
+    const existing = out.hooks[event] || []
+    out.hooks[event] = existing.filter((entry) => !isLegacyEntry(entry))
+    const migrated = existing.length - out.hooks[event].length
+    if (migrated) added.push(`hooks.${event} (migrated ${migrated} entr${migrated === 1 ? 'y' : 'ies'} from hooks/security to hooks/security-kit)`)
     for (const entry of entries) {
       if (out.hooks[event].some((existing) => entryKey(existing) === entryKey(entry))) continue
       out.hooks[event].push(entry)

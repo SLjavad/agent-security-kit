@@ -38,7 +38,7 @@ test('merge adds kit hooks and env, keeps everything else', () => {
   assert.strictEqual(settings.hooks.PreToolUse.length, 3)
   assert.strictEqual(settings.hooks.PostToolUse.length, 1)
   assert.strictEqual(added.length, 4)
-  assert.ok(JSON.stringify(settings).includes('C:/kit/hooks/security/guard-bash.cjs'))
+  assert.ok(JSON.stringify(settings).includes('C:/kit/hooks/security-kit/guard-bash.cjs'))
   assert.ok(!JSON.stringify(settings).includes('__KIT_DIR__'))
 })
 
@@ -57,7 +57,24 @@ test('merge does not overwrite an existing hook mode', () => {
 
 test('merge normalises Windows kit paths to forward slashes', () => {
   const { settings } = m.merge({}, patch, 'D:\\tools\\kit')
-  assert.ok(JSON.stringify(settings).includes('D:/tools/kit/hooks/security/scan-write.cjs'))
+  assert.ok(JSON.stringify(settings).includes('D:/tools/kit/hooks/security-kit/scan-write.cjs'))
+})
+
+test('merge replaces entries under the old hooks/security path and keeps unrelated ones', () => {
+  const old = JSON.parse(JSON.stringify(patch).split('__KIT_DIR__').join(kitDir).split('hooks/security-kit/').join('hooks/security/'))
+  const base = { env: old.env, hooks: { ...old.hooks, PreToolUse: [...old.hooks.PreToolUse, existing().hooks.PreToolUse[0]] } }
+  const { settings, added } = m.merge(base, patch, kitDir)
+  assert.ok(!JSON.stringify(settings).includes('hooks/security/'))
+  assert.strictEqual(settings.hooks.PreToolUse.length, 3)
+  assert.strictEqual(settings.hooks.PostToolUse.length, 1)
+  assert.ok(added.some((a) => /migrated 2 entries/.test(a)))
+  assert.ok(added.some((a) => /migrated 1 entry/.test(a)))
+  assert.deepStrictEqual(m.merge(settings, patch, kitDir).added, [])
+})
+
+test('remove also deletes entries under the old hooks/security path', () => {
+  const old = JSON.parse(JSON.stringify(patch).split('__KIT_DIR__').join(kitDir).split('hooks/security-kit/').join('hooks/security/'))
+  assert.deepStrictEqual(m.remove({ hooks: old.hooks }).settings, {})
 })
 
 test('remove deletes only kit entries and restores the original', () => {

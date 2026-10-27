@@ -12,11 +12,13 @@ const MANIFEST_NAME = '.agent-security-kit-manifest.json'
 const BACKUP_PREFIX = '.agent-security-kit-backup-'
 
 const COPY_RULES = [
-  { from: 'skills/security', to: 'skills/security' },
+  { from: 'skills/security-kit', to: 'skills/security-kit' },
   { from: 'agents/security-reviewer.md', to: 'agents/security-reviewer.md' },
   { from: 'security-kb', to: 'security-kb' },
-  { from: 'hooks/security', to: 'hooks/security', exclude: [/\.test\.cjs$/, /(^|\/)logs(\/|$)/] }
+  { from: 'hooks/security-kit', to: 'hooks/security-kit', exclude: [/\.test\.cjs$/, /(^|\/)logs(\/|$)/] }
 ]
+
+const LEGACY_DIRS = ['skills/security', 'hooks/security']
 
 const posix = (p) => p.split(path.sep).join('/')
 const sha256 = (file) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
@@ -97,20 +99,24 @@ const planSettings = (claudeDir, options) => {
   return { file, current, result }
 }
 
-const filterThirdParty = (source, withPlugins) => {
-  if (withPlugins) return source
-  const keep = (p) => !p.startsWith('plugins-local/')
-  const include = source.include.filter((i) => keep(i.to))
-  if (include.length === 0) return null
-  return { ...source, include, remove: (source.remove || []).filter(keep), setTools: (source.setTools || []).filter((t) => keep(t.file)) }
+const treeHash = (target) => {
+  const hash = crypto.createHash('sha256')
+  const files = fs.statSync(target).isFile() ? [''] : walk(target).sort()
+  for (const rel of files) hash.update(`${rel}\0`).update(fs.readFileSync(rel ? path.join(target, rel) : target))
+  return hash.digest('hex')
 }
 
-const planThirdParty = (claudeDir, { includeUnreviewed, withPlugins, withCurated }) => {
+const planThirdParty = (claudeDir, manifest, args) => {
   const lock = thirdParty.loadLock()
-  const chosen = thirdParty.select(lock, { only: null, includeUnreviewed, includeOptional: withCurated }).map((s) => filterThirdParty(s, withPlugins)).filter(Boolean)
-  return chosen.map((s) => ({
-    source: s,
-    items: s.include.map((i) => ({ to: i.to, exists: exists(thirdParty.safeJoin(claudeDir, i.to)) }))
+  const recorded = Object.assign({}, ...((manifest && manifest.thirdParty) || []).map((t) => t.hashes || {}))
+  return thirdParty.select(lock).map((source) => ({
+    source,
+    resolved: thirdParty.resolve(source, args),
+    items: source.include.map((i) => {
+      const dest = thirdParty.safeJoin(claudeDir, i.to)
+      const present = exists(dest)
+      return { to: i.to, exists: present, owned: present && recorded[i.to] !== undefined && recorded[i.to] === treeHash(dest) }
+    })
   }))
 }
 
@@ -152,7 +158,7 @@ const applyFiles = (files, claudeDir, backupDir, ops = defaultOps) => {
 }
 
 const smokeTest = (claudeDir) => {
-  const hooks = path.join(claudeDir, 'hooks', 'security')
+  const hooks = path.join(claudeDir, 'hooks', 'security-kit')
   const logDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-smoke-'))
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-smoke-file-'))
   const env = { ...process.env, SECURITY_HOOKS_MODE: 'enforce', SECURITY_HOOKS_LOG_DIR: logDir, SECURITY_KB_DIR: path.join(claudeDir, 'security-kb') }
@@ -177,16 +183,15 @@ const kitVersion = () => {
 }
 
 const parseArgs = (argv) => {
-  const args = { claudeDir: path.join(os.homedir(), '.claude'), dryRun: false, uninstall: false, withThirdParty: false, withPlugins: false, includeUnreviewed: false, withCurated: false, hooksMode: 'warn', nodeCommand: null, force: false, settings: true, smoke: true, verbose: false }
+  const args = { claudeDir: path.join(os.homedir(), '.claude'), dryRun: false, uninstall: false, hooksMode: 'warn', nodeCommand: null, force: false, settings: true, smoke: true, verbose: false, offline: false, pinReviewed: false }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--dry-run') args.dryRun = true
     else if (a === '--apply') throw new Error('--apply was removed: installing is the default. Use --dry-run to preview.')
+    else if (['--with-third-party', '--with-plugin-files', '--with-curated', '--include-unreviewed'].includes(a)) throw new Error(`${a} was removed: the full reviewed set is always installed. Use --offline to skip downloads.`)
     else if (a === '--uninstall') args.uninstall = true
-    else if (a === '--with-third-party') args.withThirdParty = true
-    else if (a === '--with-plugin-files') args.withPlugins = true
-    else if (a === '--include-unreviewed') args.includeUnreviewed = true
-    else if (a === '--with-curated') args.withCurated = true
+    else if (a === '--offline') args.offline = true
+    else if (a === '--pin-reviewed') args.pinReviewed = true
     else if (a === '--force') args.force = true
     else if (a === '--no-settings') args.settings = false
     else if (a === '--no-smoke-test') args.smoke = false
@@ -198,7 +203,7 @@ const parseArgs = (argv) => {
   }
   if (!['warn', 'enforce'].includes(args.hooksMode)) throw new Error('--hooks-mode must be warn or enforce')
   if (!args.claudeDir) throw new Error('--claude-dir needs a value')
-  if ((args.withPlugins || args.includeUnreviewed || args.withCurated) && !args.withThirdParty) throw new Error('--with-plugin-files, --with-curated and --include-unreviewed need --with-third-party')
+  if (args.offline && args.pinReviewed) throw new Error('--offline and --pin-reviewed cannot be combined: --offline downloads nothing')
   args.claudeDir = path.resolve(args.claudeDir)
   args.apply = !args.dryRun
   return args
@@ -226,7 +231,7 @@ const install = (args) => {
   const manifest = readManifest(args.claudeDir)
   const files = buildPlan({ kitRoot: KIT_ROOT, claudeDir: args.claudeDir, manifest, force: args.force })
   const settings = args.settings ? planSettings(args.claudeDir, args) : null
-  const third = args.withThirdParty ? planThirdParty(args.claudeDir, args) : []
+  const third = args.offline ? [] : planThirdParty(args.claudeDir, manifest, args)
   const c = counts(files)
   log(`agent-security-kit install${args.apply ? '' : ' (DRY RUN: nothing will be changed)'}`)
   log(`Target: ${args.claudeDir}`)
@@ -235,14 +240,16 @@ const install = (args) => {
   listLines(files, args.verbose)
   if (settings) log(`Settings (${settings.file}): ${settings.result.added.length ? `${args.apply ? 'adding' : 'would add'} ${settings.result.added.join(', ')}` : 'already up to date'}`)
   else log('Settings: skipped (--no-settings)')
-  if (args.withThirdParty) {
-    log('Third-party sources (fetched at pinned commits; needs network and git):')
-    for (const t of third) for (const i of t.items) log(`  ${t.source.id}: ${i.to}${i.exists ? '  (already exists)' : ''}`)
-    if (!args.withPlugins) log('  plugin files skipped (add --with-plugin-files to fetch them; activating a plugin is a manual step)')
-    if (!args.withCurated) log('  curated reference skills skipped (add --with-curated to fetch them)')
-  } else log('Third-party: skipped (add --with-third-party)')
+  if (args.offline) log('Third-party: skipped (--offline). Run again without it to add the audit, OWASP, and Trail of Bits skills.')
+  else {
+    log('Third-party sources (latest upstream commit that passes the automatic check, else the reviewed commit):')
+    for (const t of third) {
+      log(`  ${t.source.id} [${t.source.license}]: ${t.resolved.mode} ${t.resolved.sha.slice(0, 12)}. ${t.resolved.note}`)
+      for (const i of t.items) log(`    ${i.to}${i.exists ? (i.owned ? '  (update)' : '  (already exists)') : ''}`)
+    }
+  }
   const conflicts = files.filter((f) => f.action === 'conflict')
-  const thirdConflicts = third.flatMap((t) => t.items.filter((i) => i.exists && !args.force).map((i) => i.to))
+  const thirdConflicts = third.flatMap((t) => t.items.filter((i) => i.exists && !i.owned && !args.force).map((i) => i.to))
   if (conflicts.length || thirdConflicts.length) {
     log('')
     log('Conflicts: these paths exist and were not installed by this kit, or were edited since. Nothing was changed.')
@@ -259,14 +266,27 @@ const install = (args) => {
   const backupDir = path.join(args.claudeDir, `${BACKUP_PREFIX}${stamp()}`)
   const preExisting = new Set(third.flatMap((t) => t.items.filter((i) => i.exists).map((i) => i.to)))
   applyFiles(files, args.claudeDir, backupDir)
+  for (const dir of LEGACY_DIRS) pruneEmpty(path.join(args.claudeDir, dir))
   const thirdRecord = []
   try {
     for (const t of third) {
-      const written = thirdParty.apply(t.source, args.claudeDir, args.force)
-      thirdRecord.push({ id: t.source.id, sha: t.source.sha, paths: written })
+      for (const i of t.items.filter((x) => x.exists)) fs.cpSync(path.join(args.claudeDir, i.to), path.join(backupDir, i.to), { recursive: true })
+      const result = thirdParty.apply(t.source, args.claudeDir, true, t.resolved)
+      const hashes = Object.fromEntries(result.paths.map((p) => [p, treeHash(path.join(args.claudeDir, p))]))
+      thirdRecord.push({ id: t.source.id, repo: t.source.repo, license: t.source.license, sha: result.sha, reviewedSha: t.source.sha, mode: result.mode, note: result.note, paths: result.paths, hashes })
+      if (result.mode === 'reviewed-fallback' && result.note !== t.resolved.note) log(`  ${t.source.id}: ${result.note}`)
     }
   } catch (error) {
-    for (const t of third) for (const i of t.items) if (!preExisting.has(i.to)) fs.rmSync(path.join(args.claudeDir, i.to), { recursive: true, force: true })
+    for (const t of third) {
+      for (const i of t.items) {
+        const dest = path.join(args.claudeDir, i.to)
+        if (!preExisting.has(i.to)) fs.rmSync(dest, { recursive: true, force: true })
+        else if (exists(path.join(backupDir, i.to))) {
+          fs.rmSync(dest, { recursive: true, force: true })
+          fs.cpSync(path.join(backupDir, i.to), dest, { recursive: true })
+        }
+      }
+    }
     for (const f of files) if (f.action === 'create') fs.rmSync(f.dest, { force: true })
     throw new Error(`third-party fetch failed, kit files rolled back: ${error.message}`)
   }
@@ -296,6 +316,7 @@ const install = (args) => {
       return 1
     }
   }
+  if (thirdRecord.some((t) => t.mode !== 'reviewed')) thirdRecord.filter((t) => t.mode !== 'reviewed').forEach((t) => log(`  ${t.id}: installed ${t.mode} ${t.sha.slice(0, 12)} (reviewed commit ${t.reviewedSha.slice(0, 12)})`))
   log('Restart Claude Code sessions to load the skill, agent, and hooks. Hooks are in warn mode unless you chose enforce.')
   return 0
 }
@@ -314,7 +335,9 @@ const uninstall = (args) => {
   })
   const settingsFile = path.join(args.claudeDir, 'settings.json')
   const settings = args.settings && exists(settingsFile) ? (() => { const cur = settingsTool.readJson(settingsFile); return { cur, result: settingsTool.remove(cur.data) } })() : null
-  const thirdPaths = (manifest.thirdParty || []).flatMap((t) => t.paths).filter((p) => exists(path.join(args.claudeDir, p)))
+  const thirdAll = (manifest.thirdParty || []).flatMap((t) => t.paths.map((p) => ({ p, expected: (t.hashes || {})[p] }))).filter((x) => exists(path.join(args.claudeDir, x.p)))
+  const thirdModified = thirdAll.filter((x) => !args.force && x.expected !== undefined && treeHash(path.join(args.claudeDir, x.p)) !== x.expected).map((x) => x.p)
+  const thirdPaths = thirdAll.map((x) => x.p).filter((p) => !thirdModified.includes(p))
   const c = counts(entries)
   log(`agent-security-kit uninstall${args.apply ? '' : ' (DRY RUN: nothing will be changed)'}`)
   log(`Target: ${args.claudeDir}`)
@@ -322,6 +345,7 @@ const uninstall = (args) => {
   entries.filter((e) => e.action === 'modified').forEach((e) => log(`  modified  ${e.rel}  (kept; use --force to remove)`))
   log(`Settings: ${settings && settings.result.removed.length ? `${args.apply ? 'removing' : 'would remove'} ${settings.result.removed.join(', ')}` : 'no kit entries found'}`)
   if (thirdPaths.length) log(args.verbose ? `Third-party paths: ${thirdPaths.join(', ')}` : `Third-party paths: ${thirdPaths.length} (list them with --verbose)`)
+  thirdModified.forEach((p) => log(`  modified  ${p}  (kept; use --force to remove)`))
   if (!args.apply) {
     log('')
     log('Dry run complete. Re-run without --dry-run to remove.')
@@ -341,8 +365,8 @@ const uninstall = (args) => {
     fs.copyFileSync(settingsFile, `${settingsFile}.bak-${Date.now()}`)
     fs.writeFileSync(settingsFile, settingsTool.serialize(settings.result.settings, settings.cur))
   }
-  const kept = entries.filter((e) => e.action === 'modified').map((e) => e.rel)
-  for (const dir of ['skills/security', 'security-kb', 'hooks/security', 'plugins-local']) pruneEmpty(path.join(args.claudeDir, dir))
+  const kept = [...entries.filter((e) => e.action === 'modified').map((e) => e.rel), ...thirdModified]
+  for (const dir of ['skills/security-kit', 'security-kb', 'hooks/security-kit']) pruneEmpty(path.join(args.claudeDir, dir))
   if (kept.length === 0) fs.rmSync(path.join(args.claudeDir, MANIFEST_NAME), { force: true })
   log('')
   log(`Uninstalled. Removed files were copied to ${backupDir}`)

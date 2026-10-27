@@ -5,6 +5,12 @@
   "authoritativeSources": [
     { "name": "Microsoft Learn", "how": "Use the Microsoft Learn MCP server when it is available; name the framework version in every answer" }
   ],
+  "advisorySources": [
+    { "name": "Microsoft Security Response Center update guide", "url": "https://msrc.microsoft.com/update-guide" },
+    { "name": ".NET announcements", "url": "https://github.com/dotnet/announcements" },
+    { "name": "GitHub Advisory Database, NuGet ecosystem", "url": "https://github.com/advisories?query=ecosystem%3Anuget" },
+    { "name": ".NET support policy", "url": "https://dotnet.microsoft.com/platform/support/policy/dotnet-core" }
+  ],
   "verified": "2026-10",
   "docs": [
     "authz-and-tenant-isolation",
@@ -18,5 +24,5 @@
     "crypto-and-data-protection",
     "performance-vs-security"
   ],
-  "templates": ["Directory.Build.props", "nuget.config", "editorconfig-security.snippet", "gitlab-ci-dependency-audit.yml"]
+  "templates": ["Directory.Build.props", "nuget.config", "editorconfig-security.snippet", "gitlab-ci-dependency-audit.yml", "gitlab-ci-advisory-scan.yml"]
 }
