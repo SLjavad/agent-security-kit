@@ -267,6 +267,17 @@ test('uninstall without a manifest does nothing', () => {
   assert.match(r.out, /Nothing to uninstall/)
 })
 
+test('an offline install keeps the third-party ownership records of an earlier install', () => {
+  const claude = newClaudeDir()
+  assert.strictEqual(install(sharedKit, claude).code, 0)
+  const file = path.join(claude, '.agent-security-kit-manifest.json')
+  const manifest = JSON.parse(fs.readFileSync(file, 'utf8'))
+  manifest.thirdParty = [{ id: 'example', repo: 'https://example.test/r', license: 'MIT', sha: 'a', reviewedSha: 'a', mode: 'reviewed', note: '', paths: ['skills/example'], hashes: { 'skills/example': 'x' } }]
+  fs.writeFileSync(file, JSON.stringify(manifest))
+  assert.strictEqual(install(sharedKit, claude).code, 0)
+  assert.deepStrictEqual(JSON.parse(fs.readFileSync(file, 'utf8')).thirdParty, manifest.thirdParty)
+})
+
 test('--offline skips third-party sources and says how to add them', () => {
   const claude = newClaudeDir()
   const r = install(sharedKit, claude)
