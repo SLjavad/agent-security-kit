@@ -287,7 +287,13 @@ const install = (args) => {
         }
       }
     }
-    for (const f of files) if (f.action === 'create') fs.rmSync(f.dest, { force: true })
+    for (const f of files) {
+      if (f.action === 'create') fs.rmSync(f.dest, { force: true })
+      else if (['update', 'overwrite', 'remove'].includes(f.action) && exists(path.join(backupDir, f.rel))) {
+        fs.mkdirSync(path.dirname(f.dest), { recursive: true })
+        fs.copyFileSync(path.join(backupDir, f.rel), f.dest)
+      }
+    }
     throw new Error(`third-party fetch failed, kit files rolled back: ${error.message}`)
   }
   let settingsBackup = null

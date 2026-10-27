@@ -278,6 +278,25 @@ test('an offline install keeps the third-party ownership records of an earlier i
   assert.deepStrictEqual(JSON.parse(fs.readFileSync(file, 'utf8')).thirdParty, manifest.thirdParty)
 })
 
+test('a failed third-party download restores updated and removed kit files and leaves settings alone', () => {
+  const kit = copyKit()
+  const claude = newClaudeDir()
+  assert.strictEqual(install(kit, claude).code, 0)
+  const doc = path.join(claude, 'security-kb', 'core', 'patching-cadence.md')
+  const gone = path.join(claude, 'security-kb', 'core', 'performance-vs-security.md')
+  const before = fs.readFileSync(doc, 'utf8')
+  const settingsBefore = fs.readFileSync(path.join(claude, 'settings.json'), 'utf8')
+  fs.appendFileSync(path.join(kit, 'security-kb', 'core', 'patching-cadence.md'), '\nA newer line.\n')
+  fs.rmSync(path.join(kit, 'security-kb', 'core', 'performance-vs-security.md'))
+  const dead = 'http://127.0.0.1:9'
+  const r = spawnSync(process.execPath, [path.join(kit, 'tools', 'install.cjs'), '--claude-dir', claude, '--pin-reviewed', '--no-smoke-test'], { encoding: 'utf8', env: { ...process.env, HTTPS_PROXY: dead, https_proxy: dead, ALL_PROXY: dead, all_proxy: dead } })
+  assert.strictEqual(r.status, 1, r.stdout + r.stderr)
+  assert.match(r.stderr, /third-party fetch failed, kit files rolled back/)
+  assert.strictEqual(fs.readFileSync(doc, 'utf8'), before)
+  assert.ok(fs.existsSync(gone))
+  assert.strictEqual(fs.readFileSync(path.join(claude, 'settings.json'), 'utf8'), settingsBefore)
+})
+
 test('--offline skips third-party sources and says how to add them', () => {
   const claude = newClaudeDir()
   const r = install(sharedKit, claude)

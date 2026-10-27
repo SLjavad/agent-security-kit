@@ -3,7 +3,7 @@
     "\\.example(\\.|$)",
     "\\.sample(\\.|$)",
     "\\.template(\\.|$)",
-    "hooks[\\\\/]security[\\\\/]patterns\\.json$"
+    "hooks[\\\\/]security-kit[\\\\/]patterns\\.json$"
   ],
   "secrets": [
     {

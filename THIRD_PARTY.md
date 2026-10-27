@@ -26,7 +26,7 @@ No malicious content: no hidden Unicode instructions, no exfiltration endpoints 
 2. **Trail of Bits `tests/eval.sh` runs `claude -p --permission-mode bypassPermissions`** against a cloned vulnerable checkout. It is a developer evaluation script and not part of using the skills. Tests and evals are not installed.
 3. **Where Trail of Bits workflows write and read:** `audit-context.js` writes `audit-context/` into the working directory unless you pass `outDir`; `variants.js` falls back to listing directory names under your home folder; the `differential-review` skill may write reports to the working directory, the Desktop, or `~/.claude/skills/...`. The workflows themselves are not installed.
 4. **`insecure-defaults` quotes matching lines into model context and its report** when run as its workflow. Only its reference documents are installed.
-5. **Tool breadth in front matter:** the `differential-review` and `fp-check` skills declare Write and Bash (and Edit for `fp-check`) in `allowed-tools`. The agent trims in the lock file do not change what the skills themselves may do.
+5. **Tool breadth in front matter:** the `differential-review` and `fp-check` skills declare Write and Bash (and Edit for `fp-check`) in `allowed-tools`. The agent trims in the lock file do not change what the skills themselves may do. The `function-analyzer` agent keeps its `Write` tool because it writes its analysis to disk.
 
 ## Changes applied after download
 

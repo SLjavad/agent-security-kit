@@ -109,6 +109,18 @@ test('scan-write scans Edit new_string and MultiEdit edits', () => {
   assert.strictEqual(run('scan-write.cjs', { tool_name: 'MultiEdit', tool_input: { file_path: 'a.cs', edits: [{ old_string: 'x', new_string: awsKey }] } }).code, 2)
 })
 
+test('scan-write does not block an edit that removes a secret: only the new text is scanned', () => {
+  assert.strictEqual(run('scan-write.cjs', { tool_name: 'Edit', tool_input: { file_path: 'a.cs', old_string: awsKey, new_string: 'Environment.GetEnvironmentVariable("KEY")' } }).code, 0)
+  assert.strictEqual(run('scan-write.cjs', { tool_name: 'MultiEdit', tool_input: { file_path: 'a.cs', edits: [{ old_string: awsKey, new_string: 'x' }, { old_string: 'y', new_string: 'z' }] } }).code, 0)
+  assert.strictEqual(run('scan-write.cjs', { tool_name: 'MultiEdit', tool_input: { file_path: 'a.cs', edits: [{ old_string: awsKey, new_string: 'x' }, { old_string: 'y', new_string: awsKey }] } }).code, 2)
+})
+
+test('the hooks do not flag their own pattern file after the folder rename', () => {
+  const patternsFile = path.join(dir, 'patterns.json')
+  assert.strictEqual(run('scan-write.cjs', { tool_name: 'Write', tool_input: { file_path: patternsFile, content: pemHeader } }).code, 0)
+  assert.strictEqual(run('post-edit-scan.cjs', { tool_name: 'Edit', tool_input: { file_path: patternsFile } }).code, 0)
+})
+
 test('scan-write skips example and template files and placeholder passwords', () => {
   assert.strictEqual(run('scan-write.cjs', { tool_name: 'Write', tool_input: { file_path: 'config/.env.example', content: awsKey } }).code, 0)
   assert.strictEqual(run('scan-write.cjs', { tool_name: 'Write', tool_input: { file_path: 'appsettings.json', content: 'Password={{DB_PASSWORD}};' } }).code, 0)

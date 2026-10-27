@@ -1,18 +1,18 @@
 # agent-security-kit
 
-A generic, project-independent and framework-independent security kit: a router skill, a read-only reviewer agent, a reference library, deterministic hooks, templates, and and tools that install well-known third-party security skills after an automatic safety check. It contains no facts about any particular project or organisation. Project specifics go in a private `.claude/security-context.md` per project (template included).
+A generic, project-independent and framework-independent security kit: a router skill, a read-only reviewer agent, a reference library, deterministic hooks, templates, and tools that install well-known third-party security skills after an automatic safety check. It contains no facts about any particular project or organisation. Project specifics go in a private `.claude/security-context.md` per project (template included).
 
-Status: early release. Built for Claude Code skills, agents, and hooks; the reference library is plain Markdown that any agent or person can read. Only the `dotnet` stack is written so far, and the kit has not yet been tested against live Claude Code sessions beyond the included unit tests. Installation is one command with a `--dry-run` preview, conflict checks, backups, and an uninstaller (see below).
+Status: early release. Built for Claude Code skills, agents, and hooks; the reference library is plain Markdown that any agent or person can read. Only the `dotnet` stack is written so far. The hooks were checked in a live headless Claude Code session on Windows in warn mode (hook start, payload field names, findings); enforce mode is covered by unit tests only, and the GitLab jobs were run in their scanner images but not in a real pipeline. Installation is one command with a `--dry-run` preview, conflict checks, backups, and an uninstaller (see below).
 
 ## What is inside
 
 | Path | Purpose |
 |---|---|
-| `skills/security-kit/` | Router skill: tiers, `/security-kit quick`, `/security-kit pr`, `/security-kit audit`, `/security-kit deep` |
+| `skills/security-kit/` | Router skill: tiers, `/security-kit quick`, `/security-kit pr`, `/security-kit advisories`, `/security-kit audit`, `/security-kit deep` |
 | `agents/security-reviewer.md` | Read-only reviewer (Read, Grep, Glob) |
 | `security-kb/core/` | 21 framework-neutral reference documents, including CI tooling, SBOMs, containers, LLM applications, privacy requests, cryptography implementation, and recent-advisory checks (see `security-kb/INDEX.md`) |
 | `security-kb/stacks/` | One folder per language or framework with its specific notes, hook rules, and templates. `dotnet/` is complete; `_template/` and `stacks/README.md` explain how to add another |
-| `security-kb/templates/` | Framework-neutral templates: project context, secret scanning configuration, CI secret-scan job |
+| `security-kb/templates/` | Framework-neutral templates: project context, secret scanning configuration, and CI secret-scan and advisory-scan jobs (run against the pinned scanner images; the `dotnet` stack adds its own variants) |
 | `hooks/security-kit/` | Zero-dependency Node hooks: shell guard, secret scan before writes, post-edit scan; core rules plus any `stacks/*/hook-rules.json`; tests included |
 | `settings.patch.json` | Hook entries and `SECURITY_HOOKS_MODE=warn`, merged additively by `tools/merge-settings.cjs` |
 | `tools/install.cjs` | Installer and uninstaller: `--dry-run` preview, conflict-safe, rollback on failure, manifest, smoke test |
@@ -39,7 +39,7 @@ Tiers 2 and 3 never start on their own, and any subagent launch needs the user's
 node --test
 ```
 
-Runs the hook, fetcher, scanner, settings-merge, and kit-lint tests. The lint tests enforce that framework-neutral files contain no stack vocabulary and that every stack folder follows the contract.
+Runs the hook, installer, fetcher, scanner, settings-merge, and kit-lint tests. The lint tests enforce that framework-neutral files contain no stack vocabulary and that every stack folder follows the contract.
 
 ## Hooks
 
@@ -76,6 +76,8 @@ Safety rules:
 - A file that already exists and was not installed by this kit, or that you edited after installing, is a **conflict**. Nothing at all is written until you resolve it or pass `--force`, which backs the file up to `~/.claude/.agent-security-kit-backup-<time>/` first.
 - Everything is checked before the first write. If copying fails part way, the files written so far are rolled back.
 - Running it again is safe: unchanged files are skipped, unmodified files are updated, and files removed from the kit are removed.
+- If the third-party download fails, files already updated or removed are restored from the backup and settings are left untouched.
+- An install made when the skill was still named `security` is migrated: its old files and hook entries are replaced by the `security-kit` ones. The old `hooks/security/logs` folder is left alone.
 
 Options:
 
@@ -83,7 +85,7 @@ Options:
 |---|---|
 | `--dry-run` | Preview only: list what would happen and change nothing |
 | `--claude-dir <dir>` | Install somewhere other than `~/.claude` (useful for trying it out) |
-| `--hooks-mode warn|enforce` | Hook mode written to settings (default `warn`) |
+| `--hooks-mode <warn or enforce>` | Hook mode written to settings (default `warn`) |
 | `--node-command <path>` | Command used to start the hooks, for example an absolute path to node (default `node`) |
 | `--no-settings` | Copy files only; do not touch `settings.json` |
 | `--offline` | Skip the third-party downloads (install the kit's own files only) |
@@ -101,7 +103,7 @@ The old `--with-third-party`, `--with-plugin-files`, `--with-curated`, and `--in
 None of the three upstream repositories publishes tags or releases, so "latest" means the head of its default branch. Installing whatever is there unchecked would let an upstream change alter your agent's instructions after you reviewed it, so the installer compares the head with the commit that was reviewed (`reviewedSha` in `third-party/lock.json`):
 
 1. Head equals the reviewed commit: installed as is.
-2. Head is newer: the installer fetches both and looks only at files under the installed paths (files the lock removes are ignored). The newer commit is installed only if every changed file is plain documentation (`.md`, `.mdx`, `.txt`, `.json`), nothing became executable or a symbolic link, the added lines contain no hidden Unicode, download-into-shell, instruction-override phrases, long encoded blobs, or changed `tools`/`allowed-tools`/`hooks` declarations, and every text patch in the lock still applies.
+2. Head is newer: the installer fetches both and looks only at files under the installed paths (files the lock removes are ignored). The newer commit is installed only if every changed file is plain documentation (`.md`, `.mdx`, `.txt`, `.json`), nothing became executable or a symbolic link, the added lines contain no hidden Unicode, download-into-shell, instruction-override phrases, long encoded blobs, or changed `tools`/`allowed-tools`/`hooks` declarations, A text patch from the lock that no longer applies is caught at install time, and the reviewed commit is installed instead.
 3. Anything else: the reviewed commit is installed and the dry run and the install output say why.
 
 The dry run shows the decision for each source (`reviewed`, `latest`, or `reviewed-fallback`) before anything is written, and the manifest records the installed commit and the reviewed commit. The automatic check is not a review: a newer documentation change can still be wrong in ways a pattern check cannot see. Use `--pin-reviewed` for exactly the reviewed commits.
@@ -127,7 +129,7 @@ Removes only files whose content still matches the manifest (files you edited ar
 node tools/prepublish-scan.cjs --terms path/to/your-private-terms.txt
 ```
 
-Keep the terms file (internal names you must never publish) outside the repository. Choose and add your own licence file. Do not commit `dist/`. Review `THIRD_PARTY.md`: this repository references third-party work and does not redistribute it.
+Keep the terms file (internal names you must never publish) outside the repository. The kit is MIT licensed (`LICENSE`). Do not commit `dist/`. Review `THIRD_PARTY.md`: this repository references third-party work and does not redistribute it.
 
 ## Limits
 

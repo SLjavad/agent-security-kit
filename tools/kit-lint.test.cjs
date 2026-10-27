@@ -120,6 +120,13 @@ test('advisory scan templates pin the scanner image, call its real binary path, 
   assert.ok(!/\$CI_PIPELINE_SOURCE == "schedule"/.test(dotnet))
 })
 
+test('the secret-scan template pins the tested scanner image', () => {
+  const template = read(kb, 'templates', 'gitlab-ci-secret-scan.yml')
+  assert.match(template, /ghcr\.io\/gitleaks\/gitleaks:v\d+\.\d+\.\d+@sha256:[0-9a-f]{64}/)
+  assert.ok(!/REPLACE-WITH/.test(template))
+  assert.match(template, /gitleaks git --redact --exit-code 1/)
+})
+
 test('the skill and hooks folders are named security-kit, and the logs live under the same name', () => {
   const skill = read(root, 'skills', 'security-kit', 'SKILL.md')
   assert.match(skill, /^---\r?\nname: security-kit\r?\n/)
