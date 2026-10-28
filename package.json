@@ -4,6 +4,7 @@
   "description": "Generic security kit for Claude Code: router skill, reviewer agent, reference library, hooks, and tools",
   "scripts": {
     "test": "node --test",
-    "scan": "node tools/prepublish-scan.cjs"
+    "scan": "node tools/prepublish-scan.cjs",
+    "check-updates": "node tools/check-updates.cjs"
   }
 }

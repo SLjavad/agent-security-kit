@@ -1,0 +1,34 @@
+name: check-updates
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run the update check
+        id: check
+        run: |
+          set +e
+          node tools/check-updates.cjs > report.md
+          echo "code=$?" >> "$GITHUB_OUTPUT"
+      - name: Publish the report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CODE: ${{ steps.check.outputs.code }}
+        run: |
+          title="Security kit: updates to review"
+          number=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number')
+          if [ $((CODE & 2)) -ne 0 ]; then
+            if [ -n "$number" ]; then gh issue edit "$number" --body-file report.md; else gh issue create --title "$title" --body-file report.md; fi
+          elif [ "$CODE" = "0" ] && [ -n "$number" ]; then
+            gh issue close "$number" --comment "The latest check found nothing to review."
+          fi
+          if [ $((CODE & 1)) -ne 0 ]; then cat report.md; exit 1; fi

@@ -27,6 +27,7 @@ Applies to any package ecosystem. Items marked (general practice) are not from a
 - Avoid floating version ranges in applications unless lock files are enforced.
 - Commit lock files for applications and deployable services. For libraries that others consume, follow the ecosystem's convention; locks usually do not apply to consumers.
 - Pin the toolchain version (compiler, SDK, package manager) so implicit dependencies do not change silently.
+- Let a tool propose updates instead of relying on someone remembering: Dependabot (GitHub) or Renovate (GitHub, GitLab and others) open a pull request per update. Review each one, wait a few days after a release before adopting it, and do not auto-merge. A Renovate starting configuration is in `templates/renovate.json`. (general practice)
 
 ## 4. Review what you add
 Before adding a package: who publishes it, last release date, release history, repository link, licence, number of transitive dependencies, install-time scripts or plug-ins, and whether the platform already provides the feature. Check the exact name for typos against the project's own documentation. (general practice)
@@ -41,5 +42,6 @@ Before adding a package: who publishes it, last release date, release history, r
 - [ ] Lock files committed for applications; CI installs in locked mode
 - [ ] No credentials stored in package manager configuration files
 - [ ] A named owner reviews new dependencies and advisory alerts
+- [ ] Updates arrive as pull requests that someone reviews, after a delay from the release date
 
 *Stack-specific notes: `stacks/<stack>/dependency-supply-chain.md` for the detected stack, when present.*

@@ -123,27 +123,39 @@ const gateChanges = (source, repoDir, from, to) => {
   return { reasons, changed: changes.length }
 }
 
-const resolve = (source, { pinReviewed = true } = {}) => {
-  const reviewed = { sha: source.sha, mode: 'reviewed', note: null }
-  if (pinReviewed) return { ...reviewed, note: 'pinned to the reviewed commit' }
+const firstLine = (error) => error.message.split('\n')[0]
+
+const compareUpstream = (source) => {
   let head
   try {
     head = remoteHead(source)
   } catch (error) {
-    return { ...reviewed, mode: 'reviewed-fallback', note: `upstream unreachable (${error.message.split('\n')[0]}); the reviewed commit will be fetched` }
+    return { state: 'unreachable', error: firstLine(error) }
   }
-  if (head === source.sha) return { ...reviewed, note: 'upstream has not changed since the review' }
+  if (head === source.sha) return { state: 'unchanged', head }
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'third-party-gate-'))
   try {
     checkout(source, work, [head, source.sha])
     const gate = gateChanges(source, work, source.sha, head)
-    if (gate.reasons.length) return { sha: source.sha, mode: 'reviewed-fallback', latest: head, note: `upstream moved to ${head.slice(0, 12)} but the automatic check refused it: ${gate.reasons.slice(0, 4).join('; ')}${gate.reasons.length > 4 ? ` (+${gate.reasons.length - 4} more)` : ''}`, reasons: gate.reasons }
-    return { sha: head, mode: 'latest', note: `upstream moved ${source.sha.slice(0, 12)} -> ${head.slice(0, 12)}; ${gate.changed} documentation file(s) changed and the automatic check found nothing`, reasons: [] }
+    return { state: 'moved', head, changed: gate.changed, reasons: gate.reasons }
   } catch (error) {
-    return { ...reviewed, mode: 'reviewed-fallback', note: `could not compare with upstream (${error.message.split('\n')[0]}); the reviewed commit will be fetched` }
+    return { state: 'error', head, error: firstLine(error) }
   } finally {
     fs.rmSync(work, { recursive: true, force: true })
   }
+}
+
+const resolve = (source, { pinReviewed = true } = {}) => {
+  const reviewed = { sha: source.sha, mode: 'reviewed', note: null }
+  if (pinReviewed) return { ...reviewed, note: 'pinned to the reviewed commit' }
+  const upstream = compareUpstream(source)
+  const fallback = (note, extra = {}) => ({ ...reviewed, mode: 'reviewed-fallback', note, ...extra })
+  if (upstream.state === 'unreachable') return fallback(`upstream unreachable (${upstream.error}); the reviewed commit will be fetched`)
+  if (upstream.state === 'unchanged') return { ...reviewed, note: 'upstream has not changed since the review' }
+  if (upstream.state === 'error') return fallback(`could not compare with upstream (${upstream.error}); the reviewed commit will be fetched`)
+  const { head, reasons } = upstream
+  if (reasons.length) return fallback(`upstream moved to ${head.slice(0, 12)} but the automatic check refused it: ${reasons.slice(0, 4).join('; ')}${reasons.length > 4 ? ` (+${reasons.length - 4} more)` : ''}`, { latest: head, reasons })
+  return { sha: head, mode: 'latest', note: `upstream moved ${source.sha.slice(0, 12)} -> ${head.slice(0, 12)}; ${upstream.changed} documentation file(s) changed and the automatic check found nothing`, reasons: [] }
 }
 
 const copyAndPatch = (source, work, target, force) => {
@@ -239,7 +251,7 @@ const main = () => {
   if (args.apply) fs.writeFileSync(path.join(path.resolve(args.target), '.third-party-manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
 }
 
-module.exports = { safeJoin, validateSource, loadLock, setTools, replaceText, parseArgs, select, resolve, apply, gateChanges, REVIEW_RANK, GATE_PATTERNS }
+module.exports = { safeJoin, validateSource, loadLock, setTools, replaceText, parseArgs, select, resolve, compareUpstream, apply, gateChanges, REVIEW_RANK, GATE_PATTERNS }
 
 if (require.main === module) {
   try {

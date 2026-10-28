@@ -223,6 +223,41 @@ test('the secret-scan template tells how to use the kit allowlist', () => {
   assert.ok(fs.existsSync(path.join(kb, 'templates', 'gitleaks.toml')))
 })
 
+test('Dependabot lists every folder of CI templates that names an image, and covers the workflow actions', () => {
+  const config = read(root, '.github', 'dependabot.yml')
+  const listed = [...config.matchAll(/^\s+- "(\/[^"]+)"\s*$/gm)].map((m) => new RegExp(`^${m[1].replace(/\./g, '\\.').replace(/\*/g, '[^/]+')}$`))
+  const folders = new Set()
+  const collect = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.isDirectory()) collect(path.join(dir, e.name))
+      else if (/^[^.].*\.ya?ml$/i.test(e.name) && /^\s*image:\s*\S+/m.test(read(dir, e.name))) folders.add('/' + path.relative(root, dir).split(path.sep).join('/'))
+    }
+  }
+  collect(kb)
+  assert.ok(folders.size >= 2)
+  for (const folder of folders) assert.ok(listed.some((re) => re.test(folder)), `${folder} holds images but is not listed in .github/dependabot.yml`)
+  assert.match(config, /package-ecosystem: "github-actions"/)
+  assert.match(config, /cooldown:\s+default-days: \d+/)
+})
+
+test('every action in the workflows is pinned to a full commit', () => {
+  const dir = path.join(root, '.github', 'workflows')
+  const files = fs.readdirSync(dir).filter((f) => /\.ya?ml$/.test(f))
+  assert.ok(files.length >= 1)
+  for (const file of files) {
+    const uses = [...read(dir, file).matchAll(/^\s*-?\s*uses:\s*(\S+)/gm)].map((m) => m[1])
+    assert.ok(uses.length >= 1, `${file} uses no action, so the check proves nothing`)
+    for (const u of uses) assert.match(u, /@[0-9a-f]{40}$/, `${file}: ${u} is not pinned to a commit`)
+  }
+})
+
+test('the Renovate template is valid JSON, waits after a release, and never automerges', () => {
+  const config = JSON.parse(read(kb, 'templates', 'renovate.json'))
+  assert.ok(config.extends.includes('config:best-practices'))
+  assert.match(config.minimumReleaseAge, /^\d+ days?$/)
+  assert.ok(!JSON.stringify(config).includes('automerge'))
+})
+
 test('settings patch points at hook scripts that exist', () => {
   const patch = JSON.parse(read(root, 'settings.patch.json'))
   const scripts = JSON.stringify(patch).match(/__KIT_DIR__\/hooks\/security-kit\/[\w.-]+\.cjs/g) || []
