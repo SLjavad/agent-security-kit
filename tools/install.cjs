@@ -313,9 +313,10 @@ const install = (args) => {
   }
   const owned = {}
   for (const f of files) if (f.action !== 'remove' && f.action !== 'keep') owned[f.rel] = f.hash
+  const effectiveMode = (settings && settings.result.settings.env && settings.result.settings.env.SECURITY_HOOKS_MODE) || (manifest && manifest.hooksMode) || args.hooksMode
   fs.writeFileSync(
     path.join(args.claudeDir, MANIFEST_NAME),
-    JSON.stringify({ kit: 'agent-security-kit', version: kitVersion(), installedAt: new Date().toISOString(), hooksMode: args.hooksMode, files: owned, thirdParty: args.offline ? (manifest && manifest.thirdParty) || [] : thirdRecord, settings: { file: settings ? settings.file : null, backup: settingsBackup, added: settings ? settings.result.added : [] } }, null, 2) + '\n'
+    JSON.stringify({ kit: 'agent-security-kit', version: kitVersion(), installedAt: new Date().toISOString(), hooksMode: effectiveMode, files: owned, thirdParty: args.offline ? (manifest && manifest.thirdParty) || [] : thirdRecord, settings: { file: settings ? settings.file : null, backup: settingsBackup, added: settings ? settings.result.added : [] } }, null, 2) + '\n'
   )
   log('')
   log(`Installed. ${files.filter((f) => ['create', 'update', 'overwrite'].includes(f.action)).length} file(s) written.`)

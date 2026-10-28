@@ -7,7 +7,7 @@ Companion to `core/crypto-and-data-protection.md`. Microsoft Learn facts checked
 |---|---|
 | Password storage | `Rfc2898DeriveBytes.Pbkdf2` with a SHA-2 hash, or ASP.NET Core Identity's `PasswordHasher` |
 | HMAC | `HMACSHA256` or stronger, `HMACSHA256.HashData` |
-| Signatures | `ECDsa` or `RSA` with SHA-2; `Ed25519` where supported |
+| Signatures | `ECDsa` or `RSA` with SHA-2. For post-quantum signatures, `MLDsa` exists in .NET 10 and its availability depends on the operating system ([cross-platform cryptography](https://learn.microsoft.com/dotnet/standard/security/cross-platform-cryptography)) |
 | Authenticated encryption | `AesGcm` or `ChaCha20Poly1305`, unique nonce per message |
 | Cookies, anti-forgery, short-lived tokens | ASP.NET Core Data Protection (`IDataProtector`) |
 | Random bytes | `RandomNumberGenerator` (not `Random`; not `Guid.NewGuid()` for secrets) |

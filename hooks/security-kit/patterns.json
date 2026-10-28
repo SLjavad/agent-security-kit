@@ -31,7 +31,8 @@
     {
       "id": "connection-string-password",
       "regex": "(?:Password|Pwd)\\s*=\\s*(?![{$%<*;\\s\"'])[^;\"'\\s]{4,}",
-      "flags": "i"
+      "flags": "i",
+      "shellRegex": "\\b(?:Password|Pwd)\\s*=\\s*(?![{$%<*;\\s\"'])[^;\"'\\s]{4,}"
     },
     {
       "id": "generic-secret-assignment",

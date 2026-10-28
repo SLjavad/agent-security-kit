@@ -1,6 +1,6 @@
 # Replace REPLACE-WITH-PINNED-VERSION with the SDK tag you build with, pinned by digest (tag@sha256:...), before use.
-# `dotnet list package` exits 0 even when it finds vulnerable packages (checked with SDK 10.0.401), so the job reads its JSON
-# and fails on high or critical findings, and on a "problems" entry, which means the vulnerability data could not be read.
+# `dotnet list package` exits 0 even when it finds vulnerable packages, so the job reads its JSON and fails on high or critical
+# findings, and on a "problems" entry (a project that could not be audited). Run against SDK 10.0.403: mcr.microsoft.com/dotnet/sdk:10.0@sha256:de4fe90a98845d75910b9769662465c84de1a934665c431279d1382b2bddc02b
 # Restore already fails on NU1903 and NU1904 when Directory.Build.props from this folder is in use; this job covers the rest.
 dependency-audit:
   stage: test
@@ -12,7 +12,7 @@ dependency-audit:
     - dotnet list package --vulnerable --include-transitive --format json > vulnerable-packages.json
     - |
       if grep -Eq '"severity": *"(High|Critical)"' vulnerable-packages.json; then echo "High or critical vulnerable packages found; see vulnerable-packages.json"; exit 1; fi
-      if grep -q '"problems"' vulnerable-packages.json; then echo "Vulnerability data could not be read; a clean result proves nothing"; exit 1; fi
+      if grep -q '"problems"' vulnerable-packages.json; then echo "dotnet list package reported problems (see vulnerable-packages.json); a clean result proves nothing"; exit 1; fi
   artifacts:
     when: always
     expire_in: 7 days

@@ -10,6 +10,9 @@ const compile = (rule) => new RegExp(rule.regex, rule.flags || '')
 // A rule may carry an `unless` expression: when the whole text matches it, the rule does not apply.
 const compileRule = (rule) => ({ id: rule.id, re: compile(rule), unless: rule.unless ? new RegExp(rule.unless, rule.flags || '') : null })
 
+// A secret rule may carry a stricter `shellRegex` for commands, where a prefixed password variable for a local container is routine.
+const compileShellRule = (rule) => compileRule(rule.shellRegex ? { ...rule, regex: rule.shellRegex } : rule)
+
 const compileDrift = (rule) => {
   const base = { id: rule.id, files: new RegExp(rule.files, 'i') }
   if (rule.regex) return { ...base, re: compile(rule) }
@@ -54,6 +57,7 @@ const loadStackDriftRules = () => {
 
 const compiled = {
   secrets: patterns.secrets.map(compileRule),
+  shellSecrets: patterns.secrets.map(compileShellRule),
   bash: patterns.bash.map(compileRule),
   configDrift: [...patterns.configDrift.map(compileDrift), ...loadStackDriftRules()],
   excludeNames: patterns.excludeNames.map((p) => new RegExp(p, 'i')),

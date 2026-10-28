@@ -12,7 +12,7 @@ Companion to `core/ci-cd-and-secrets.md`. From Microsoft Learn ([app secrets](ht
 ## CI specifics
 - Restore in locked mode with audit errors enabled (`dependency-supply-chain.md`), using the `templates/Directory.Build.props` settings with the `CI` variable set.
 - Use a credential provider or CI-injected token for private feeds; never commit feed credentials.
-- Pin the SDK image by digest. `templates/gitlab-ci-dependency-audit.yml` shows a restore-and-report job. The generic secret scan job is `../../templates/gitlab-ci-secret-scan.yml`.
+- Pin the SDK image by digest. `templates/gitlab-ci-dependency-audit.yml` restores in locked mode and fails the job on high or critical findings, because `dotnet list package` itself exits 0 on findings (checked with SDK 10.0.403). The generic secret scan job is `../../templates/gitlab-ci-secret-scan.yml`.
 - Do not upload `appsettings.Production.json`, `*.pfx`, or `secrets.json` as artifacts.
 
 ## Review questions

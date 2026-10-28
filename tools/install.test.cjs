@@ -190,6 +190,16 @@ test('--hooks-mode, --node-command, and --no-settings are honoured', () => {
   assert.ok(!fs.existsSync(path.join(b, 'settings.json')))
 })
 
+test('the manifest records the hook mode that settings.json really has, also on a rerun without --hooks-mode', () => {
+  const claude = newClaudeDir()
+  const manifestMode = () => JSON.parse(fs.readFileSync(path.join(claude, '.agent-security-kit-manifest.json'), 'utf8')).hooksMode
+  assert.strictEqual(install(sharedKit, claude, '--hooks-mode', 'enforce', '--no-smoke-test').code, 0)
+  assert.strictEqual(manifestMode(), 'enforce')
+  assert.strictEqual(install(sharedKit, claude, '--no-smoke-test').code, 0)
+  assert.strictEqual(JSON.parse(fs.readFileSync(path.join(claude, 'settings.json'), 'utf8')).env.SECURITY_HOOKS_MODE, 'enforce')
+  assert.strictEqual(manifestMode(), 'enforce')
+})
+
 test('reinstalling with --node-command or --hooks-mode changes the existing entries instead of adding more', () => {
   const claude = newClaudeDir()
   assert.strictEqual(install(sharedKit, claude, '--no-smoke-test').code, 0)

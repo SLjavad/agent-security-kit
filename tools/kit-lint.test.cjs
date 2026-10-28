@@ -146,6 +146,46 @@ test('the router names every skill the lock file installs and says how to route 
   assert.match(read(root, 'README.md'), /Overlapping triggers/)
 })
 
+const frontMatter = (text) => Object.fromEntries((text.match(/^---\r?\n([\s\S]*?)\r?\n---/) || [, ''])[1].split(/\r?\n/).filter((l) => /^[\w-]+:/.test(l)).map((l) => [l.slice(0, l.indexOf(':')), l.slice(l.indexOf(':') + 1).trim()]))
+
+test('the router skill front matter is valid and its command table matches the argument hint', () => {
+  const text = read(root, 'skills', 'security-kit', 'SKILL.md')
+  const meta = frontMatter(text)
+  assert.strictEqual(meta.name, 'security-kit')
+  assert.ok(meta.description && meta.description.length <= 1024, `description is ${(meta.description || '').length} characters, the limit is 1024`)
+  const hint = (meta['argument-hint'].match(/\[([a-z|]+)\]/) || [])[1]
+  assert.ok(hint, 'argument-hint lists the commands')
+  for (const command of hint.split('|')) {
+    assert.ok(text.includes(`\`/security-kit ${command}`), `the command table lacks ${command}`)
+    assert.ok(meta.description.includes(`/security-kit ${command}`), `the description lacks ${command}`)
+  }
+})
+
+test('the reviewer agent stays read-only and every doc the router points to exists', () => {
+  const agent = frontMatter(read(root, 'agents', 'security-reviewer.md'))
+  assert.strictEqual(agent.name, 'security-reviewer')
+  assert.deepStrictEqual(agent.tools.split(/,\s*/).sort(), ['Glob', 'Grep', 'Read'])
+  const router = read(root, 'skills', 'security-kit', 'SKILL.md')
+  for (const m of router.matchAll(/`((?:security-kb\/)?(?:core|templates|stacks)\/[A-Za-z0-9_.\/<>-]+\.(?:md|yml|json))`/g)) {
+    if (m[1].includes('<')) continue
+    assert.ok(fs.existsSync(path.join(kb, m[1].replace(/^security-kb\//, ''))), `router points to missing ${m[1]}`)
+  }
+})
+
+test('every hook pattern compiles, ids are unique, and shell and unless expressions are valid', () => {
+  const patterns = JSON.parse(read(root, 'hooks', 'security-kit', 'patterns.json'))
+  const ids = []
+  for (const group of ['secrets', 'bash', 'configDrift']) {
+    for (const rule of patterns[group]) {
+      ids.push(rule.id)
+      for (const key of ['regex', 'shellRegex', 'unless', 'files']) if (rule[key]) assert.doesNotThrow(() => new RegExp(rule[key], rule.flags || ''), `${rule.id}.${key}`)
+    }
+  }
+  assert.strictEqual(new Set(ids).size, ids.length, 'rule ids are unique')
+  for (const key of ['excludeNames', 'excludePaths']) for (const p of patterns[key]) assert.doesNotThrow(() => new RegExp(p, 'i'), key)
+  for (const rule of patterns.secrets.filter((r) => r.shellRegex)) assert.ok(rule.regex, `${rule.id} keeps its content regex`)
+})
+
 test('CI templates leave no image unpinned unless it is a marked placeholder with instructions', () => {
   const files = []
   const collect = (dir) => {
@@ -173,6 +213,7 @@ test('the dependency audit job fails on high or critical findings and on unreada
   assert.match(job, /--format json > vulnerable-packages\.json/)
   assert.match(job, /grep -Eq '"severity": \*"\(High\|Critical\)"' vulnerable-packages\.json; then .*exit 1/)
   assert.match(job, /grep -q '"problems"' vulnerable-packages\.json; then .*exit 1/)
+  assert.doesNotMatch(job, /vulnerability data could not be read/i, 'a problems entry is a project-level error, not specifically a data-source failure')
 })
 
 test('the secret-scan template tells how to use the kit allowlist', () => {

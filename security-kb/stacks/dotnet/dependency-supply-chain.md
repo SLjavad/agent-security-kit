@@ -18,6 +18,7 @@ Companion to `core/dependency-supply-chain.md`. Checked against Microsoft Learn 
 
 ## Repeatable restores
 - Enable lock files with `RestorePackagesWithLockFile` and restore with `--locked-mode` (`RestoreLockedMode`) in CI ([package references](https://learn.microsoft.com/nuget/consume-packages/package-references-in-project-files)).
+- `--locked-mode` does nothing for a project that has no `packages.lock.json`: restore succeeds silently (checked with SDK 10.0.403). Enable the lock file and commit it, or the flag gives no repeatability.
 - Commit the lock file for applications and executables. Do not commit it for libraries you do not ship: consumers do not use a dependency's lock file.
 - NU1403 (content hash mismatch) means the package differs from the last restore. Treat it as possible tampering until the source is identified ([NU1403](https://learn.microsoft.com/nuget/reference/errors-and-warnings/nu1403)).
 - Floating versions such as `2.*` are repeatable only with lock files. Pin the SDK with `global.json`, because implicit package versions change with it.

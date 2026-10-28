@@ -115,6 +115,13 @@ test('merge replaces entries under the old hooks/security path and keeps unrelat
   assert.deepStrictEqual(m.merge(settings, patch, kitDir).added, [])
 })
 
+test('every hook the settings patch adds is recognised as a kit entry, so uninstall and migration always find it', () => {
+  const resolved = JSON.parse(JSON.stringify(patch).split('__KIT_DIR__').join(kitDir))
+  const entries = Object.values(resolved.hooks).flat()
+  assert.ok(entries.length >= 3)
+  for (const entry of entries) assert.ok(m.isKitEntry(entry), JSON.stringify(entry))
+})
+
 test('remove also deletes entries under the old hooks/security path', () => {
   const old = JSON.parse(JSON.stringify(patch).split('__KIT_DIR__').join(kitDir).split('hooks/security-kit/').join('hooks/security/'))
   assert.deepStrictEqual(m.remove({ hooks: old.hooks }).settings, {})
