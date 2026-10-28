@@ -210,6 +210,7 @@ test('CI templates leave no image unpinned unless it is a marked placeholder wit
 
 test('the dependency audit job fails on high or critical findings and on unreadable vulnerability data', () => {
   const job = read(stacksDir, 'dotnet', 'templates', 'gitlab-ci-dependency-audit.yml')
+  assert.match(job, /^\s*image: mcr\.microsoft\.com\/dotnet\/sdk:\S+@sha256:[0-9a-f]{64}\s*$/m, 'the SDK image is pinned by digest')
   assert.match(job, /--format json > vulnerable-packages\.json/)
   assert.match(job, /grep -Eq '"severity": \*"\(High\|Critical\)"' vulnerable-packages\.json; then .*exit 1/)
   assert.match(job, /grep -q '"problems"' vulnerable-packages\.json; then .*exit 1/)

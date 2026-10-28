@@ -1,10 +1,10 @@
-# Replace REPLACE-WITH-PINNED-VERSION with the SDK tag you build with, pinned by digest (tag@sha256:...), before use.
+# The image is pinned by digest to SDK 10.0.403, the version this job was tested with. Refresh the digest when a newer 10.0 patch ships.
 # `dotnet list package` exits 0 even when it finds vulnerable packages, so the job reads its JSON and fails on high or critical
-# findings, and on a "problems" entry (a project that could not be audited). Run against SDK 10.0.403: mcr.microsoft.com/dotnet/sdk:10.0@sha256:de4fe90a98845d75910b9769662465c84de1a934665c431279d1382b2bddc02b
+# findings, and on a "problems" entry (a project that could not be audited).
 # Restore already fails on NU1903 and NU1904 when Directory.Build.props from this folder is in use; this job covers the rest.
 dependency-audit:
   stage: test
-  image: mcr.microsoft.com/dotnet/sdk:REPLACE-WITH-PINNED-VERSION
+  image: mcr.microsoft.com/dotnet/sdk:10.0@sha256:de4fe90a98845d75910b9769662465c84de1a934665c431279d1382b2bddc02b
   variables:
     CI: "true"
   script:
