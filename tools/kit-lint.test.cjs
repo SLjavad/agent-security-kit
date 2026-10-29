@@ -223,21 +223,19 @@ test('the secret-scan template tells how to use the kit allowlist', () => {
   assert.ok(fs.existsSync(path.join(kb, 'templates', 'gitleaks.toml')))
 })
 
-test('Dependabot lists every folder of CI templates that names an image, and covers the workflow actions', () => {
-  const config = read(root, '.github', 'dependabot.yml')
-  const listed = [...config.matchAll(/^\s+- "(\/[^"]+)"\s*$/gm)].map((m) => new RegExp(`^${m[1].replace(/\./g, '\\.').replace(/\*/g, '[^/]+')}$`))
-  const folders = new Set()
+test('every image pinned in the CI templates is covered by the update check', () => {
+  // The .NET SDK pin is compared by checkDotnet against Microsoft's feed, the rest by PINS against GitHub releases.
+  const checked = new Set(['security-kb/stacks/dotnet/templates/gitlab-ci-dependency-audit.yml', ...require('./check-updates.cjs').PINS.flatMap((p) => p.files.map((f) => f.join('/')))])
+  const unchecked = []
   const collect = (dir) => {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (e.isDirectory()) collect(path.join(dir, e.name))
-      else if (/^[^.].*\.ya?ml$/i.test(e.name) && /^\s*image:\s*\S+/m.test(read(dir, e.name))) folders.add('/' + path.relative(root, dir).split(path.sep).join('/'))
+      const file = path.join(dir, e.name)
+      if (e.isDirectory()) collect(file)
+      else if (/\.ya?ml$/i.test(e.name) && /@sha256:[0-9a-f]{64}/.test(read(file)) && !checked.has(path.relative(root, file).split(path.sep).join('/'))) unchecked.push(path.relative(root, file))
     }
   }
   collect(kb)
-  assert.ok(folders.size >= 2)
-  for (const folder of folders) assert.ok(listed.some((re) => re.test(folder)), `${folder} holds images but is not listed in .github/dependabot.yml`)
-  assert.match(config, /package-ecosystem: "github-actions"/)
-  assert.match(config, /cooldown:\s+default-days: \d+/)
+  assert.deepStrictEqual(unchecked, [], 'a template pins an image that tools/check-updates.cjs does not compare with its latest release')
 })
 
 test('every action in the workflows is pinned to a full commit', () => {

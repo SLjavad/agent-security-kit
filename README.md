@@ -19,8 +19,7 @@ Status: early release. Built for Claude Code skills, agents, and hooks; the refe
 | `tools/fetch-third-party.cjs` | Fetches third-party skills at the reviewed commit (or, with `--latest`, a newer upstream commit that passes the automatic check) and applies recorded trims and patches |
 | `tools/merge-settings.cjs` | Dry-run-first merge and removal of the hook entries, with backup |
 | `tools/prepublish-scan.cjs` | Scans this folder for secrets, personal paths, emails, internal hosts, and your own terms |
-| `tools/check-updates.cjs` | Read-only update check: third-party skills against upstream, .NET support dates and SDK against Microsoft's release feed, and the age of each stack's verified date |
-| `.github/dependabot.yml` | Weekly update pull requests for the images in the CI templates (7-day cooldown) and for the actions the workflow uses |
+| `tools/check-updates.cjs` | Read-only update check: third-party skills against upstream, .NET support dates and SDK against Microsoft's release feed, the age of each stack's verified date, and the pinned osv-scanner, gitleaks, and `actions/checkout` tags against their latest releases |
 | `.github/workflows/check-updates.yml` | Weekly run of the update check; opens or updates one issue when something needs review and closes it when nothing does |
 | `third-party/lock.json` | Sources, licences, the reviewed commit of each, review state, trims, patches |
 | `THIRD_PARTY.md` | Sources, licences, and what is changed |
@@ -141,14 +140,13 @@ Removes only files whose content still matches the manifest (files you edited ar
 
 ### Update checks
 
-Three parts keep the pinned things from going stale. None of them changes anything on its own: each produces a pull request or an issue for a person to review.
+Two parts keep the pinned things from going stale. Neither changes anything on its own: the check produces a report or an issue for a person to review. (Dependabot is not used: its docker ecosystem reads Dockerfiles and manifests, not CI template files, so its runs on the template folders failed.)
 
-- `.github/dependabot.yml`: Dependabot opens a pull request when an image in the CI templates (osv-scanner, gitleaks, the .NET SDK) has a newer tag or digest, and when an action used by the workflow has a new release. Images wait 7 days after release first. Dependabot reads the non-dotted `.yml` files in the listed folders; it skips a file named `.gitlab-ci.yml`, and its hosted service runs on GitHub only.
-- `tools/check-updates.cjs` covers what Dependabot cannot. It compares each third-party source with its upstream and says whether the gate would accept the change, checks the support dates in `patching-cadence.md` and the SDK version noted in the dependency-audit template against Microsoft's release feed, and flags a stack whose `verified` month is more than 6 months old. A moved third-party commit is never installed by this check: read the diff, then move `sha` and `reviewedSha` together in `third-party/lock.json`.
+- `tools/check-updates.cjs` compares each third-party source with its upstream and says whether the gate would accept the change, checks the support dates in `patching-cadence.md` and the SDK version noted in the dependency-audit template against Microsoft's release feed, flags a stack whose `verified` month is more than 6 months old, and compares the tags pinned in the CI templates (osv-scanner, gitleaks) and in the workflow (`actions/checkout`) with each project's latest GitHub release. Only the tag is compared: when one moves, read its release notes, wait a few days, then refresh the tag and the digest together by hand. A moved third-party commit is never installed by this check: read the diff, then move `sha` and `reviewedSha` together in `third-party/lock.json`.
 - `security-kb/templates/renovate.json` is a starting point for a project hosted on GitLab: Renovate's `config:best-practices` preset plus a 7-day minimum release age, with no automerge.
 
 ```bash
-node tools/check-updates.cjs [--only third-party,dotnet,stacks] [--max-age-months 6]
+node tools/check-updates.cjs [--only third-party,dotnet,stacks,pins] [--max-age-months 6]
 ```
 
 It prints a markdown report. Exit code 0 means nothing needs review, 1 that a check could not run, 2 that something needs review, 3 both. `.github/workflows/check-updates.yml` runs it every Monday and keeps one open issue in step with the result.
@@ -168,7 +166,7 @@ Keep the terms file (internal names you must never publish) outside the reposito
 ## Limits
 
 - **Overlapping triggers.** The installed `owasp-security`, `security-audit`, and `differential-review` skills have their own descriptions that also match "security review". The router's description asks to be used first and its "Routing among security skills" section restates the tier rules, but which skill starts first is the model's choice and the kit cannot force it. The installed third-party descriptions are not patched.
-- **Update checks not yet seen running on GitHub.** The Dependabot file was written from its documentation and source code, and the weekly workflow from GitHub's workflow syntax; neither has run on GitHub yet. `tools/check-updates.cjs` is tested and was run live. Watch the first Monday run and the first Dependabot pull requests before relying on them.
+- **The weekly workflow has not been seen running on GitHub yet.** It was written from GitHub's workflow syntax; `tools/check-updates.cjs` is tested and was run live. Watch the first Monday run (or start it by hand with "Run workflow") before relying on it.
 - Intrusion detection, live traffic monitoring, and penetration testing of running systems are operational work; this kit gives checklists, not detection.
 - AI review does not replace a human penetration test for systems that handle money or identity.
 - Stack documents cite their sources and the date they were checked, and mark statements without a fetched source as general practice. Re-check version-specific statements for your target version. Only the `dotnet` stack is populated so far; other stacks need the same research before they are added.

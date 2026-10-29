@@ -92,6 +92,29 @@ test('third-party results separate real work from noise and from failures', () =
   assert.strictEqual(pick({ state: 'error', head, error: 'bad object' }).level, 'error')
 })
 
+test('pinned tools are compared with the latest release tag', async () => {
+  const pinned = {}
+  for (const i of await cu.checkPins(root, async () => 'v0.0.0')) pinned[i.subject] = /pinned (v\d+\.\d+\.\d+)/.exec(i.text)[1]
+  assert.deepStrictEqual(Object.keys(pinned), ['osv-scanner image', 'gitleaks image', 'actions/checkout'])
+  const byRepo = { 'google/osv-scanner': pinned['osv-scanner image'], 'gitleaks/gitleaks': pinned['gitleaks image'], 'actions/checkout': pinned['actions/checkout'] }
+  assert.deepStrictEqual((await cu.checkPins(root, async (repo) => byRepo[repo])).map((i) => i.level), ['ok', 'ok', 'ok'])
+  const newer = await cu.checkPins(root, async (repo) => (repo === 'gitleaks/gitleaks' ? 'v99.0.0' : byRepo[repo]))
+  assert.deepStrictEqual(newer.map((i) => i.level), ['ok', 'action', 'ok'])
+  assert.match(newer[1].text, /pinned v\d+\.\d+\.\d+; the latest release is v99\.0\.0.*gitlab-ci-secret-scan\.yml/)
+  const empty = fs.mkdtempSync(path.join(tmp, 'pins-'))
+  for (const f of ['security-kb/templates/gitlab-ci-advisory-scan.yml', 'security-kb/stacks/dotnet/templates/gitlab-ci-advisory-scan.yml', 'security-kb/templates/gitlab-ci-secret-scan.yml', '.github/workflows/check-updates.yml']) {
+    fs.mkdirSync(path.dirname(path.join(empty, f)), { recursive: true })
+    fs.writeFileSync(path.join(empty, f), 'nothing pinned here')
+  }
+  assert.ok((await cu.checkPins(empty, async () => 'v1.0.0')).every((i) => i.level === 'action' && /could not be read/.test(i.text)))
+})
+
+test('a failing release lookup is reported as an error and does not hide the other areas', async () => {
+  const items = await cu.run({ root, only: ['pins', 'stacks'], latest: async () => { throw new Error('GitHub answered 403 for google/osv-scanner') }, maxAgeMonths: 600 })
+  assert.ok(items.some((i) => i.level === 'error' && i.area === 'pins' && /403/.test(i.text)))
+  assert.ok(items.some((i) => i.area === 'stacks' && i.level === 'ok'))
+})
+
 const gitIn = (dir, ...args) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.test', '-c', 'commit.gpgsign=false', '-c', 'core.autocrlf=false', ...args], { cwd: dir, encoding: 'utf8' })
 
 test('compareUpstream tells unchanged, moved and unreachable repositories apart', () => {
@@ -143,7 +166,7 @@ test('the report is a markdown table per area, escapes pipes, and counts what ma
 })
 
 test('parseArgs accepts the documented options and rejects the rest', () => {
-  assert.deepStrictEqual(cu.parseArgs([]), { only: ['third-party', 'dotnet', 'stacks'], maxAgeMonths: 6 })
+  assert.deepStrictEqual(cu.parseArgs([]), { only: ['third-party', 'dotnet', 'stacks', 'pins'], maxAgeMonths: 6 })
   assert.deepStrictEqual(cu.parseArgs(['--only', 'stacks', '--max-age-months', '12']), { only: ['stacks'], maxAgeMonths: 12 })
   assert.throws(() => cu.parseArgs(['--only', 'nope']), /--only takes/)
   assert.throws(() => cu.parseArgs(['--only']), /--only takes/)

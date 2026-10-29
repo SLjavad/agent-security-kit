@@ -4,7 +4,7 @@ const fetcher = require('./fetch-third-party.cjs')
 
 const FEED_URL = 'https://builds.dotnet.microsoft.com/dotnet/release-metadata/releases-index.json'
 const DEFAULT_MAX_AGE_MONTHS = 6
-const AREAS = ['third-party', 'dotnet', 'stacks']
+const AREAS = ['third-party', 'dotnet', 'stacks', 'pins']
 const SUPPORTED_PHASES = new Set(['active', 'maintenance'])
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
@@ -61,7 +61,7 @@ const checkDotnet = ({ feed, cadenceText, templateText }) => {
     const release = releases.get(tag[1])
     if (!release) action('dependency-audit template', `the image uses SDK channel ${tag[1]}, which the feed does not list`)
     else if (!SUPPORTED_PHASES.has(release['support-phase'])) action('dependency-audit template', `the image uses SDK channel ${tag[1]}, which Microsoft lists as ${release['support-phase']}`)
-    else if (release['latest-sdk'] !== tested[1]) action('dependency-audit template', `the pinned image was tested with SDK ${tested[1]}; Microsoft lists ${release['latest-sdk']} as the latest ${tag[1]} SDK. Refresh the digest (Dependabot proposes it) and the version in the template header`)
+    else if (release['latest-sdk'] !== tested[1]) action('dependency-audit template', `the pinned image was tested with SDK ${tested[1]}; Microsoft lists ${release['latest-sdk']} as the latest ${tag[1]} SDK. Refresh the digest and the version in the template header`)
   }
   if (items.length === 0) items.push(item('ok', 'dotnet', 'lifecycle and SDK', `support dates match the Microsoft feed for ${documented.length} version(s) and the pinned SDK ${tested[1]} is the latest ${tag[1]} SDK`))
   return items
@@ -86,6 +86,32 @@ const checkStacks = (stacksDir, now, maxAgeMonths) => {
     })
 }
 
+// Each pin is a release tag written in a file. Only the tag is compared; refresh the digest together with the tag.
+const PINS = [
+  { subject: 'osv-scanner image', repo: 'google/osv-scanner', re: /ghcr\.io\/google\/osv-scanner:(v\d+\.\d+\.\d+)@sha256:/, files: [['security-kb', 'templates', 'gitlab-ci-advisory-scan.yml'], ['security-kb', 'stacks', 'dotnet', 'templates', 'gitlab-ci-advisory-scan.yml']] },
+  { subject: 'gitleaks image', repo: 'gitleaks/gitleaks', re: /ghcr\.io\/gitleaks\/gitleaks:(v\d+\.\d+\.\d+)@sha256:/, files: [['security-kb', 'templates', 'gitlab-ci-secret-scan.yml']] },
+  { subject: 'actions/checkout', repo: 'actions/checkout', re: /actions\/checkout@[0-9a-f]{40} # (v\d+\.\d+\.\d+)/, files: [['.github', 'workflows', 'check-updates.yml']] }
+]
+
+const checkPins = (root, latest) =>
+  Promise.all(PINS.map(async (p) => {
+    const where = p.files.map((f) => f.join('/')).join(', ')
+    const found = p.files.map((f) => (fs.readFileSync(path.join(root, ...f), 'utf8').match(p.re) || [])[1])
+    if (found.some((v) => !v)) return item('action', 'pins', p.subject, `the pinned version could not be read from ${where}`)
+    const pinned = [...new Set(found)]
+    const tag = await latest(p.repo)
+    if (pinned.length === 1 && pinned[0] === tag) return item('ok', 'pins', p.subject, `pinned ${tag}, the latest release`)
+    return item('action', 'pins', p.subject, `pinned ${pinned.join(' and ')}; the latest release is ${tag}. Read its release notes, wait a few days, then refresh the tag and digest in ${where}`)
+  }))
+
+const fetchLatest = async (repo) => {
+  const headers = { 'User-Agent': 'security-kit-update-check', Accept: 'application/vnd.github+json' }
+  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`
+  const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, { headers, signal: AbortSignal.timeout(30000) })
+  if (!response.ok) throw new Error(`GitHub answered ${response.status} for ${repo}`)
+  return (await response.json()).tag_name
+}
+
 const fetchFeed = async () => {
   const response = await fetch(FEED_URL, { signal: AbortSignal.timeout(30000) })
   if (!response.ok) throw new Error(`the .NET release feed answered ${response.status}`)
@@ -100,7 +126,7 @@ const guarded = async (area, items, produce) => {
   }
 }
 
-const run = async ({ root = kitRoot, now = new Date(), only = AREAS, maxAgeMonths = DEFAULT_MAX_AGE_MONTHS, compare = fetcher.compareUpstream, feed = fetchFeed } = {}) => {
+const run = async ({ root = kitRoot, now = new Date(), only = AREAS, maxAgeMonths = DEFAULT_MAX_AGE_MONTHS, compare = fetcher.compareUpstream, feed = fetchFeed, latest = fetchLatest } = {}) => {
   const items = []
   const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8')
   if (only.includes('third-party')) await guarded('third-party', items, () => checkThirdParty(fetcher.loadLock(path.join(root, 'third-party', 'lock.json')), compare))
@@ -112,6 +138,7 @@ const run = async ({ root = kitRoot, now = new Date(), only = AREAS, maxAgeMonth
     }))
   }
   if (only.includes('stacks')) await guarded('stacks', items, () => checkStacks(path.join(root, 'security-kb', 'stacks'), now, maxAgeMonths))
+  if (only.includes('pins')) await guarded('pins', items, () => checkPins(root, latest))
   return items
 }
 
@@ -127,7 +154,7 @@ const buildReport = (items, now = new Date()) => {
   for (const area of AREAS) {
     const rows = items.filter((i) => i.area === area)
     if (rows.length === 0) continue
-    lines.push('', `## ${{ 'third-party': 'Third-party skills', dotnet: '.NET', stacks: 'Stacks' }[area]}`, '', '| Subject | Status | Detail |', '|---|---|---|')
+    lines.push('', `## ${{ 'third-party': 'Third-party skills', dotnet: '.NET', stacks: 'Stacks', pins: 'Pinned tools' }[area]}`, '', '| Subject | Status | Detail |', '|---|---|---|')
     for (const r of rows) lines.push(`| ${cell(r.subject)} | ${LABEL[r.level]} | ${cell(r.text)} |`)
   }
   return lines.join('\n') + '\n'
@@ -149,7 +176,7 @@ const parseArgs = (argv) => {
   return args
 }
 
-module.exports = { checkThirdParty, checkDotnet, checkStacks, parseSupported, parseArgs, run, buildReport, exitCode }
+module.exports = { checkThirdParty, checkDotnet, checkStacks, checkPins, PINS, parseSupported, parseArgs, run, buildReport, exitCode }
 
 if (require.main === module) {
   let args
