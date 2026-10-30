@@ -39,7 +39,7 @@ Never start tier 2 or 3 on your own. Never escalate silently.
 
 The reference library is framework-neutral in `core/`. Language and framework specifics live in one folder per stack under `stacks/`.
 
-1. Detect the project's stacks: for each `stacks/<id>/stack.json` (folders starting with `_` or `.` are templates, skip them), look for its `detect` file patterns in the project, up to three directory levels deep. A project can match several stacks; use all of them.
+1. Detect the project's stacks: for each `stacks/<id>/stack.json` (folders starting with `_` or `.` are templates, skip them), look for its `detect` file patterns in the project, up to five directory levels deep, skipping `node_modules`, `bin`, `obj`, `dist`, and `.git`. A project can match several stacks; use all of them.
 2. For a topic, read `core/<topic>.md` first. Then read `stacks/<id>/<topic>.md` for each detected stack if it exists.
 3. For facts about a stack, use the `authoritativeSources` in its `stack.json` (for example a vendor documentation server) and name the version you are advising for.
 4. If no stack matches, use the core documents alone and say that no stack-specific notes were available. Do not apply one stack's advice to another.

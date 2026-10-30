@@ -1,0 +1,7 @@
+# Add to the project's .npmrc. Keep credentials out of this file: use the CI credential mechanism.
+# Stops npm running scripts from package.json files. Explicit commands such as `npm run build` still run their own script.
+# Some packages need an install step; run those explicitly after `npm ci`.
+ignore-scripts=true
+# Only install versions published more than this many days ago. Documented in the npm 11 CLI docs (checked October 2026);
+# confirm that your npm version supports it before relying on it.
+min-release-age=7

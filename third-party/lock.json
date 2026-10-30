@@ -5,7 +5,7 @@
       "repo": "https://github.com/cloudflare/security-audit-skill",
       "sha": "c1c8a8c1471069fb0e188eeaff69b8e8db6564a8",
       "license": "MIT",
-      "review": "partial",
+      "review": "full",
       "include": [
         {
           "from": "skills/security-audit",
@@ -18,7 +18,7 @@
       ],
       "reviewedSha": "c1c8a8c1471069fb0e188eeaff69b8e8db6564a8",
       "reviewedAt": "2026-10-26",
-      "reviewScope": "Executables: both validators read for imports, file and process use, and the run path; no network, environment, child-process or write calls. SKILL.md and README read; the 12 companion files were pattern-scanned only.",
+      "reviewScope": "All 18 installed files read in full on 2026-10-30, plus pattern scans. Both validators read for imports, file and process use, and the run path; no network, environment, child-process or write calls.",
       "reviewNotes": [
         "Validators are read-only and exit 1 on native Windows because O_NOFOLLOW and O_NONBLOCK are undefined there; use WSL, Linux, or macOS for full audits.",
         "Test files removed: they only spawn node and mkfifo against the validators."
@@ -29,7 +29,7 @@
       "repo": "https://github.com/agamm/claude-code-owasp",
       "sha": "8ac7965caa212b4a850aff8d3df0081ab3fa9eed",
       "license": "MIT",
-      "review": "partial",
+      "review": "full",
       "include": [
         {
           "from": ".claude/skills/owasp-security",
@@ -38,7 +38,7 @@
       ],
       "reviewedSha": "8ac7965caa212b4a850aff8d3df0081ab3fa9eed",
       "reviewedAt": "2026-10-26",
-      "reviewScope": "All 5 files pattern-scanned (no hidden Unicode, injection phrases, or executables); SKILL.md front matter and layout read.",
+      "reviewScope": "All 5 files read in full on 2026-10-30, plus pattern scans (no hidden Unicode, injection phrases, or executables).",
       "reviewNotes": [
         "No executable files."
       ]
@@ -48,7 +48,7 @@
       "repo": "https://github.com/trailofbits/skills",
       "sha": "196a9073ab10d35bacf111f945e02c00b2c6883a",
       "license": "CC-BY-SA-4.0",
-      "review": "partial",
+      "review": "full",
       "include": [
         {
           "from": "plugins/differential-review/skills/differential-review",
@@ -119,7 +119,7 @@
       ],
       "reviewedSha": "196a9073ab10d35bacf111f945e02c00b2c6883a",
       "reviewedAt": "2026-10-27",
-      "reviewScope": "Executables: the three workflow scripts (variants.js, audit-context.js, audit.js), all shell scripts, Python tests, agent and command files were read or pattern-scanned; instruction files pattern-scanned plus the main skill files read. The install now takes only the skill folders, six agent files, and the insecure-defaults reference documents.",
+      "reviewScope": "Executables: the three workflow scripts (variants.js, audit-context.js, audit.js), all shell scripts, Python tests, agent and command files were read or pattern-scanned on 2026-10-27. On 2026-10-30 all 72 installed files (the skill folders, six agent files, and the insecure-defaults reference documents) were read in full, plus pattern scans. Files that are not installed were not re-read.",
       "reviewNotes": [
         "Workflow scripts, commands, hooks, tests, evals, and plugin manifests are not installed. The skills run as ordinary user skills; the patches below remove their dependence on the plugin namespace and on the workflow scripts.",
         "Patches: namespaced agent names become bare names, the workflow-only routing in audit-context-building and variant-analysis becomes manual, {baseDir} in the adversarial-modeler agent becomes a user path, and Workflow is removed from the audit-context-building allowed-tools. A patch that no longer matches makes the install fall back to the reviewed commit.",

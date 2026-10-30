@@ -224,6 +224,64 @@ test('post-edit-scan flags risky C# patterns only in .cs files', () => {
   assert.strictEqual(run('post-edit-scan.cjs', editedFile('notes.txt', cs)).code, 0)
 })
 
+const reactPkg = '{"dependencies":{"react":"^19.0.0"}}'
+
+// A file inside a throwaway git project, so the search for package.json stops there.
+const projectFile = (pkg, rel, content, extra = {}) => {
+  const root = fs.mkdtempSync(path.join(tmp, 'rp-'))
+  fs.mkdirSync(path.join(root, '.git'))
+  if (pkg !== null) fs.writeFileSync(path.join(root, 'package.json'), pkg)
+  for (const [name, text] of Object.entries({ ...extra, [rel]: content })) {
+    fs.mkdirSync(path.dirname(path.join(root, name)), { recursive: true })
+    fs.writeFileSync(path.join(root, name), text)
+  }
+  return { tool_name: 'Write', tool_input: { file_path: path.join(root, rel) } }
+}
+
+test('react hook rules fire on the risky form and stay quiet on the close safe form', () => {
+  const cases = [
+    ['react-dangerous-html', 'App.tsx', '<div dangerouslySetInnerHTML={{ __html: html }} />', '<div>{text}</div>'],
+    ['react-dom-html-sink', 'dom.js', 'el.innerHTML = value', "if (el.innerHTML === '') {} el.textContent = value"],
+    ['react-dom-html-sink', 'dom2.js', "node.insertAdjacentHTML('beforeend', value)", 'node.append(value)'],
+    ['react-dom-html-sink', 'dom3.js', 'document.write(value)', 'document.title = value'],
+    ['react-code-from-string', 'run.js', 'eval(code)', 'evaluate(code)'],
+    ['react-code-from-string', 'run2.ts', "const f = new Function('a', 'return a')", 'const f = (a) => a'],
+    ['react-javascript-url', 'Link.jsx', '<a href="javascript:void(0)">x</a>', '<a href="https://example.test">x</a>'],
+    ['react-token-in-web-storage', 'auth.ts', "localStorage.setItem('authToken', token)", "localStorage.setItem('theme', 'dark')"],
+    ['react-postmessage-wildcard', 'frame.ts', "win.postMessage(data, '*')", "win.postMessage(data, 'https://app.example.test')"],
+    ['react-secret-in-public-env', '.env.production', 'VITE_PAYMENT_API_KEY=value', 'VITE_PUBLISHABLE_KEY=value'],
+    ['react-secret-in-public-env', 'client.ts', 'const k = import.meta.env.VITE_AUTH_TOKEN', 'const k = import.meta.env.VITE_APP_NAME']
+  ]
+  for (const [rule, name, bad, good] of cases) {
+    assert.match(run('post-edit-scan.cjs', projectFile(reactPkg, name, bad)).stderr, new RegExp(rule), `${rule} on ${name}`)
+    assert.strictEqual(run('post-edit-scan.cjs', projectFile(reactPkg, name, good)).code, 0, `${rule} false positive on ${name}`)
+  }
+  assert.strictEqual(run('post-edit-scan.cjs', projectFile(reactPkg, 'notes.txt', 'eval(code) dangerouslySetInnerHTML')).code, 0)
+  assert.strictEqual(run('post-edit-scan.cjs', projectFile(reactPkg, '.env.example', 'VITE_PAYMENT_API_KEY=value')).code, 0)
+})
+
+test('react hook rules apply only where a package.json lists react', () => {
+  const fires = (input) => run('post-edit-scan.cjs', input).code === 2
+  const risky = 'eval(code)'
+  const node = '{"dependencies":{"express":"^5.0.0"}}'
+  assert.ok(fires(projectFile(reactPkg, 'a.ts', risky)))
+  assert.ok(fires(projectFile('{"devDependencies":{"react-dom":"^19.0.0"}}', 'a.ts', risky)))
+  assert.ok(!fires(projectFile(node, 'a.ts', risky)), 'a Node project without react')
+  assert.ok(fires(projectFile(null, 'a.ts', risky)), 'no package.json anywhere: the rule applies')
+  assert.ok(fires(projectFile(node, 'apps/web/src/a.ts', risky, { 'apps/web/package.json': reactPkg })), 'workspace package lists react')
+  assert.ok(fires(projectFile(reactPkg, 'apps/api/a.ts', risky, { 'apps/api/package.json': node })), 'a parent package.json that lists react still counts')
+  assert.ok(fires(projectFile(node, '.env.production', 'VITE_PAYMENT_API_KEY=value')), 'the public-prefix rule is not tied to react')
+})
+
+test('a rule requirement works for any stack and ignores a file name that is a path', () => {
+  const rule = { id: 'demo-eval', files: '\\.py$', regex: '\\beval\\(', requires: { file: 'marker.txt', regex: 'ENABLE' } }
+  const env = { SECURITY_KB_DIR: kbWithStacks({ demo: { configDrift: [rule, { ...rule, id: 'zz-path-file', requires: { file: '../marker.txt', regex: 'ENABLE' } }] } }) }
+  const code = (input) => run('post-edit-scan.cjs', input, 'enforce', env)
+  assert.match(code(projectFile(null, 'a.py', 'eval(x)', { 'marker.txt': 'ENABLE' })).stderr, /demo-eval/)
+  assert.strictEqual(code(projectFile(null, 'a.py', 'eval(x)', { 'marker.txt': 'other' })).code, 0)
+  assert.ok(!code(projectFile(null, 'a.py', 'eval(x)', { 'marker.txt': 'ENABLE' })).stderr.includes('zz-path-file'))
+})
+
 test('post-edit-scan ignores clean, missing, binary and oversized files', () => {
   assert.strictEqual(run('post-edit-scan.cjs', editedFile('clean.cs', 'class A { }')).code, 0)
   assert.strictEqual(run('post-edit-scan.cjs', { tool_input: { file_path: path.join(tmp, 'missing.cs') } }).code, 0)

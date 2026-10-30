@@ -1,0 +1,17 @@
+// Add to eslint.config.js (flat config). Needs the eslint-plugin-react package.
+// react/no-danger: "Disallow usage of dangerous JSX properties". It checks DOM elements only; list your own components in customComponentNames, or use ['*'] for all.
+// react/jsx-no-script-url: disallows javascript: URLs.
+// react/jsx-no-target-blank: disallows target="_blank" without rel="noreferrer"; modern browsers imply noopener, so this matters only if you support legacy browsers.
+import react from 'eslint-plugin-react'
+
+export default [
+  {
+    files: ['**/*.{jsx,tsx}'],
+    plugins: { react },
+    rules: {
+      'react/no-danger': ['error', { customComponentNames: ['*'] }],
+      'react/jsx-no-script-url': 'error',
+      'react/jsx-no-target-blank': 'error'
+    }
+  }
+]

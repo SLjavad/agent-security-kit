@@ -13,8 +13,15 @@ const compileRule = (rule) => ({ id: rule.id, re: compile(rule), unless: rule.un
 // A secret rule may carry a stricter `shellRegex` for commands, where a prefixed password variable for a local container is routine.
 const compileShellRule = (rule) => compileRule(rule.shellRegex ? { ...rule, regex: rule.shellRegex } : rule)
 
+// A drift rule may carry `requires: { file, regex }`: it applies only where a file of that name, in the edited file's folder or a parent up to the git root, matches the regex.
+const compileRequires = (req) => {
+  if (!req) return null
+  if (!req.file || typeof req.file !== 'string' || path.basename(req.file) !== req.file) throw new Error('requires.file must be a plain file name')
+  return { file: req.file, re: new RegExp(req.regex) }
+}
+
 const compileDrift = (rule) => {
-  const base = { id: rule.id, files: new RegExp(rule.files, 'i') }
+  const base = { id: rule.id, files: new RegExp(rule.files, 'i'), requires: compileRequires(rule.requires) }
   if (rule.regex) return { ...base, re: compile(rule) }
   if (!rule.count) throw new Error(`drift rule ${rule.id} needs regex or count`)
   return {
@@ -92,8 +99,25 @@ const isExcludedPath = (file) => Boolean(file) && (compiled.excludeNames.some((r
 
 const scan = (rules, text) => rules.filter((r) => r.re.test(text) && !(r.unless && r.unless.test(text))).map((r) => r.id)
 
+// shortcut: when no such file exists anywhere up the tree the rule applies (a security check should not go quiet because a manifest is missing); when some exist, one of them must match.
+const requirementMet = (req, file) => {
+  let dir = path.dirname(path.resolve(file))
+  let seen = false
+  for (;;) {
+    try {
+      const text = fs.readFileSync(path.join(dir, req.file), 'utf8')
+      seen = true
+      if (req.re.test(text)) return true
+    } catch {}
+    const parent = path.dirname(dir)
+    if (fs.existsSync(path.join(dir, '.git')) || parent === dir) return !seen
+    dir = parent
+  }
+}
+
 const driftMatches = (rule, file, text) => {
   if (!rule.files.test(file)) return false
+  if (rule.requires && !requirementMet(rule.requires, file)) return false
   if (rule.re) return rule.re.test(text)
   const block = rule.extract ? text.match(rule.extract) : [text, text]
   if (!block) return false

@@ -1,0 +1,11 @@
+{
+  "configDrift": [
+    { "id": "react-dangerous-html", "files": "\\.(?:jsx?|tsx?)$", "requires": { "file": "package.json", "regex": "\"react(?:-dom)?\"\\s*:" }, "regex": "\\bdangerouslySetInnerHTML\\b" },
+    { "id": "react-dom-html-sink", "files": "\\.(?:jsx?|tsx?)$", "requires": { "file": "package.json", "regex": "\"react(?:-dom)?\"\\s*:" }, "regex": "\\.(?:innerHTML|outerHTML)\\s*=(?!=)|\\binsertAdjacentHTML\\s*\\(|\\bdocument\\.write(?:ln)?\\s*\\(" },
+    { "id": "react-code-from-string", "files": "\\.(?:jsx?|tsx?)$", "requires": { "file": "package.json", "regex": "\"react(?:-dom)?\"\\s*:" }, "regex": "\\beval\\s*\\(|\\bnew\\s+Function\\s*\\(" },
+    { "id": "react-javascript-url", "files": "\\.(?:jsx?|tsx?)$", "requires": { "file": "package.json", "regex": "\"react(?:-dom)?\"\\s*:" }, "regex": "(?:href|src|action|formAction)\\s*=\\s*\\{?\\s*['\"`]\\s*javascript:", "flags": "i" },
+    { "id": "react-token-in-web-storage", "files": "\\.(?:jsx?|tsx?)$", "requires": { "file": "package.json", "regex": "\"react(?:-dom)?\"\\s*:" }, "regex": "(?:localStorage|sessionStorage)\\s*\\.\\s*setItem\\s*\\(\\s*['\"`][^'\"`]*(?:token|jwt|session|secret|password)[^'\"`]*['\"`]", "flags": "i" },
+    { "id": "react-postmessage-wildcard", "files": "\\.(?:jsx?|tsx?)$", "requires": { "file": "package.json", "regex": "\"react(?:-dom)?\"\\s*:" }, "regex": "\\.postMessage\\s*\\([^;]*,\\s*['\"]\\*['\"]" },
+    { "id": "react-secret-in-public-env", "files": "(?:^|[\\\\/])\\.env(?:\\.[\\w.-]+)?$|\\.(?:jsx?|tsx?)$", "regex": "\\b(?:VITE|REACT_APP|NEXT_PUBLIC|PUBLIC)_[A-Z0-9_]*(?:SECRET|PASSWORD|PRIVATE_KEY|API_KEY|TOKEN)\\b" }
+  ]
+}

@@ -2,7 +2,7 @@
 
 A generic, project-independent and framework-independent security kit: a router skill, a read-only reviewer agent, a reference library, deterministic hooks, templates, and tools that install well-known third-party security skills after an automatic safety check. It contains no facts about any particular project or organisation. Project specifics go in a private `.claude/security-context.md` per project (template included).
 
-Status: early release. Built for Claude Code skills, agents, and hooks; the reference library is plain Markdown that any agent or person can read. Only the `dotnet` stack is written so far. The hooks were checked in a live headless Claude Code session on Windows in warn mode (hook start, payload field names, findings); enforce mode is covered by unit tests only, and the GitLab jobs were run in their scanner images but not in a real pipeline. Installation is one command with a `--dry-run` preview, conflict checks, backups, and an uninstaller (see below).
+Status: early release. Built for Claude Code skills, agents, and hooks; the reference library is plain Markdown that any agent or person can read. Two stacks are written so far, `dotnet` and `react` (browser side). The hooks were checked in a live headless Claude Code session on Windows in warn mode (hook start, payload field names, findings); enforce mode is covered by unit tests only, and the GitLab jobs were run in their scanner images but not in a real pipeline. Installation is one command with a `--dry-run` preview, conflict checks, backups, and an uninstaller (see below).
 
 ## What is inside
 
@@ -11,7 +11,7 @@ Status: early release. Built for Claude Code skills, agents, and hooks; the refe
 | `skills/security-kit/` | Router skill: tiers, `/security-kit quick`, `/security-kit pr`, `/security-kit advisories`, `/security-kit audit`, `/security-kit deep` |
 | `agents/security-reviewer.md` | Read-only reviewer (Read, Grep, Glob) |
 | `security-kb/core/` | 21 framework-neutral reference documents, including CI tooling, SBOMs, containers, LLM applications, privacy requests, cryptography implementation, and recent-advisory checks (see `security-kb/INDEX.md`) |
-| `security-kb/stacks/` | One folder per language or framework with its specific notes, hook rules, and templates. `dotnet/` is complete; `_template/` and `stacks/README.md` explain how to add another |
+| `security-kb/stacks/` | One folder per language or framework with its specific notes, hook rules, and templates. `dotnet/` is complete and `react/` covers the browser side; `_template/`, `stacks/README.md`, and `docs/adding-a-stack.md` explain how to add another |
 | `security-kb/templates/` | Framework-neutral templates: project context, secret scanning configuration, a Renovate starting configuration for dependency updates, and CI secret-scan and advisory-scan jobs (run against the pinned scanner images; the `dotnet` stack adds its own variants) |
 | `hooks/security-kit/` | Zero-dependency Node hooks: shell guard, secret scan before writes, post-edit scan; core rules plus any `stacks/*/hook-rules.json`; tests included |
 | `settings.patch.json` | Hook entries and `SECURITY_HOOKS_MODE=warn`, merged additively by `tools/merge-settings.cjs` |
@@ -169,4 +169,4 @@ Keep the terms file (internal names you must never publish) outside the reposito
 - **The weekly workflow has not been seen running on GitHub yet.** It was written from GitHub's workflow syntax; `tools/check-updates.cjs` is tested and was run live. Watch the first Monday run (or start it by hand with "Run workflow") before relying on it.
 - Intrusion detection, live traffic monitoring, and penetration testing of running systems are operational work; this kit gives checklists, not detection.
 - AI review does not replace a human penetration test for systems that handle money or identity.
-- Stack documents cite their sources and the date they were checked, and mark statements without a fetched source as general practice. Re-check version-specific statements for your target version. Only the `dotnet` stack is populated so far; other stacks need the same research before they are added.
+- Stack documents cite their sources and the date they were checked, and mark statements without a fetched source as general practice. Re-check version-specific statements for your target version. Only the `dotnet` and `react` stacks are populated so far; other stacks need the same research before they are added (see `docs/adding-a-stack.md`).

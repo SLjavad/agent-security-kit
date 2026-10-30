@@ -1,0 +1,29 @@
+{
+  "id": "react",
+  "name": "React (browser front end: JSX or TSX, a bundler such as Vite, npm)",
+  "detect": ["*.jsx", "*.tsx"],
+  "authoritativeSources": [
+    { "name": "React documentation", "how": "Fetch the react.dev page for the topic and name the React version in every answer" },
+    { "name": "npm documentation", "how": "Fetch docs.npmjs.com for the npm major version in use; behaviour and options differ between majors" },
+    { "name": "MDN Web Docs", "how": "Use for browser features: Content Security Policy, Trusted Types, Subresource Integrity, postMessage, Web Crypto" }
+  ],
+  "advisorySources": [
+    { "name": "React repository security advisories", "url": "https://github.com/facebook/react/security/advisories" },
+    { "name": "React blog (security announcements)", "url": "https://react.dev/blog" },
+    { "name": "GitHub Advisory Database, npm ecosystem", "url": "https://github.com/advisories?query=ecosystem%3Anpm" }
+  ],
+  "verified": "2026-10",
+  "docs": [
+    "dependency-supply-chain",
+    "injection-deserialization-memory",
+    "authz-and-tenant-isolation",
+    "crypto-and-data-protection",
+    "ci-cd-and-secrets",
+    "hardening-network-server",
+    "patching-cadence",
+    "pii-and-logging",
+    "abuse-and-integrations",
+    "llm-and-agent-security"
+  ],
+  "templates": ["eslint-security.snippet", "npmrc.snippet"]
+}

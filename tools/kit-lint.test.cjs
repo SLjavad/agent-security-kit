@@ -13,7 +13,7 @@ const mdFiles = (dir) => fs.readdirSync(dir).filter((f) => f.endsWith('.md'))
 const stacks = fs.readdirSync(stacksDir, { withFileTypes: true }).filter((e) => e.isDirectory() && !/^[_.]/.test(e.name)).map((e) => e.name)
 const coreDocs = mdFiles(coreDir).map((f) => f.replace(/\.md$/, ''))
 
-const STACK_VOCABULARY = [/\.NET\b/, /\bNuGet\b/i, /ASP\.NET/, /EF Core|Entity Framework/, /\bC#/, /csproj|\.sln\b/, /Kestrel/, /Roslyn/, /\bdotnet\b/i, /Microsoft Learn/, /\bLINQ\b/, /Blazor/, /Razor/]
+const STACK_VOCABULARY = [/\.NET\b/, /\bNuGet\b/i, /ASP\.NET/, /EF Core|Entity Framework/, /\bC#/, /csproj|\.sln\b/, /Kestrel/, /Roslyn/, /\bdotnet\b/i, /Microsoft Learn/, /\bLINQ\b/, /Blazor/, /Razor/, /\bReact\b/, /\bJSX\b|\bTSX\b/, /dangerouslySetInnerHTML/, /\bnpm\b/i, /package\.json/]
 
 const neutralFiles = () => [
   ...coreDocs.map((d) => path.join(coreDir, `${d}.md`)),
@@ -254,6 +254,13 @@ test('the Renovate template is valid JSON, waits after a release, and never auto
   assert.ok(config.extends.includes('config:best-practices'))
   assert.match(config.minimumReleaseAge, /^\d+ days?$/)
   assert.ok(!JSON.stringify(config).includes('automerge'))
+})
+
+test('the guide for adding a stack exists, is linked, and names the fields and files the lint enforces', () => {
+  const guide = read(root, 'docs', 'adding-a-stack.md')
+  for (const word of ['stack.json', 'detect', 'advisorySources', 'verified', 'hook-rules.json', 'STACK_VOCABULARY', 'hooks.test.cjs', 'PINS', 'prepublish-scan']) assert.ok(guide.includes(word), `the guide does not mention ${word}`)
+  assert.match(read(root, 'README.md'), /docs\/adding-a-stack\.md/)
+  assert.match(read(stacksDir, 'README.md'), /docs\/adding-a-stack\.md/)
 })
 
 test('settings patch points at hook scripts that exist', () => {

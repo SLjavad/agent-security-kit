@@ -6,11 +6,11 @@ Which commit is installed: the reviewed commit, by default. With `--latest`, the
 
 | Id | Source | Licence | Reviewed commit | Installed as | Review (2026-10-26, Trail of Bits re-scoped 2026-10-27) |
 |---|---|---|---|---|---|
-| cloudflare-security-audit | https://github.com/cloudflare/security-audit-skill | MIT | `c1c8a8c1471069fb0e188eeaff69b8e8db6564a8` | `skills/security-audit` (tier 2 and 3 method) | partial: executables read, main files read, companion files pattern-scanned |
-| agamm-owasp | https://github.com/agamm/claude-code-owasp | MIT | `8ac7965caa212b4a850aff8d3df0081ab3fa9eed` | `skills/owasp-security` | partial: all files pattern-scanned, no executables |
-| trailofbits-skills | https://github.com/trailofbits/skills | CC-BY-SA-4.0 | `196a9073ab10d35bacf111f945e02c00b2c6883a` | Skills `differential-review`, `sharp-edges`, `audit-context-building`, `variant-analysis`, `fp-check`; six agents; `security-kb/third-party/insecure-defaults` (reference documents) | partial: executables read or pattern-scanned, main files read |
+| cloudflare-security-audit | https://github.com/cloudflare/security-audit-skill | MIT | `c1c8a8c1471069fb0e188eeaff69b8e8db6564a8` | `skills/security-audit` (tier 2 and 3 method) | full: all 18 installed files read, 2026-10-30 |
+| agamm-owasp | https://github.com/agamm/claude-code-owasp | MIT | `8ac7965caa212b4a850aff8d3df0081ab3fa9eed` | `skills/owasp-security` | full: all 5 installed files read, 2026-10-30 |
+| trailofbits-skills | https://github.com/trailofbits/skills | CC-BY-SA-4.0 | `196a9073ab10d35bacf111f945e02c00b2c6883a` | Skills `differential-review`, `sharp-edges`, `audit-context-building`, `variant-analysis`, `fp-check`; six agents; `security-kb/third-party/insecure-defaults` (reference documents) | full: all 72 installed files read, 2026-10-30 |
 
-`partial` is used for everything: no source was read line by line. The full per-source scope and notes are in `third-party/lock.json` (`reviewScope`, `reviewNotes`).
+`full` means every file that gets installed was read in full by an AI reader (Claude Code) on 2026-10-30, on top of the pattern scans below. It is not a human line-by-line audit, and it does not cover upstream files the kit does not install. The per-source scope and notes are in `third-party/lock.json` (`reviewScope`, `reviewNotes`).
 
 ## What the review covered
 
