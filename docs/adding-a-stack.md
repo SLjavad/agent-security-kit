@@ -64,7 +64,7 @@ Never put stack vocabulary into the neutral files (`core/`, `INDEX.md`, `skills/
 
 ## 4. Hook rules (optional)
 
-`hook-rules.json` adds deterministic checks to the post-edit hook. The hook reads every stack folder when it runs, so there is nothing to register. The hook does not read `detect`: a rule applies to every file whose path matches `files`, in any project. Make `files` as narrow as the stack allows. If the extension is shared with other stacks (`.js`, `.ts`), add `requires` to the rule, for example `"requires": { "file": "package.json", "regex": "\"react\"\\s*:" }`. The rule then fires only when that file, in the edited file's folder or a parent up to the git root, matches. With no such file anywhere on that path the rule still fires, so a missing manifest does not silence a check.
+`hook-rules.json` adds deterministic checks to the post-edit hook. The hook reads every stack folder when it runs, so there is nothing to register. The hook does not read `detect`: a rule applies to every file whose path matches `files`, in any project. Make `files` as narrow as the stack allows. If the extension is shared with other stacks (`.js`, `.ts`), add `requires` to the rule, for example `"requires": { "file": "package.json", "regex": "\"react\"\\s*:" }`. The rule then fires only when that file, in the edited file's folder or a parent up to the git root, matches. With no such file anywhere on that path the rule still fires, so a missing manifest does not silence a check. A rule may also carry `"mode": "warn"`: it is logged but never blocks, even when the user sets enforce mode. Use it for patterns that also match legitimate code; any other value for `mode` makes the hook drop the rule.
 
 ```json
 {

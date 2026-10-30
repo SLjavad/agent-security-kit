@@ -7,8 +7,19 @@ const patterns = JSON.parse(fs.readFileSync(path.join(__dirname, 'patterns.json'
 
 const compile = (rule) => new RegExp(rule.regex, rule.flags || '')
 
+// A rule may carry `"mode": "warn"`: it is logged in every mode but never blocks, for patterns that also match routine work.
+const warnOnly = new Set()
+const noteMode = (rule) => {
+  if (rule.mode === undefined) return
+  if (rule.mode !== 'warn') throw new Error(`rule ${rule.id}: mode must be "warn"`)
+  warnOnly.add(rule.id)
+}
+
 // A rule may carry an `unless` expression: when the whole text matches it, the rule does not apply.
-const compileRule = (rule) => ({ id: rule.id, re: compile(rule), unless: rule.unless ? new RegExp(rule.unless, rule.flags || '') : null })
+const compileRule = (rule) => {
+  noteMode(rule)
+  return { id: rule.id, re: compile(rule), unless: rule.unless ? new RegExp(rule.unless, rule.flags || '') : null }
+}
 
 // A secret rule may carry a stricter `shellRegex` for commands, where a prefixed password variable for a local container is routine.
 const compileShellRule = (rule) => compileRule(rule.shellRegex ? { ...rule, regex: rule.shellRegex } : rule)
@@ -21,6 +32,7 @@ const compileRequires = (req) => {
 }
 
 const compileDrift = (rule) => {
+  noteMode(rule)
   const base = { id: rule.id, files: new RegExp(rule.files, 'i'), requires: compileRequires(rule.requires) }
   if (rule.regex) return { ...base, re: compile(rule) }
   if (!rule.count) throw new Error(`drift rule ${rule.id} needs regex or count`)
@@ -173,11 +185,17 @@ const HINTS = {
   'post-edit-scan': 'Fix what was flagged, and move any secret to a secret store.'
 }
 
+// A download piped into a shell is not fixed by deleting a value: the agent saves it, reads it, and only then runs it, or asks the user.
+const DOWNLOAD_HINT = 'Rewrite the command: save the download to a file in a temporary folder, read the file, and run it only if nothing in it is unexpected (further downloads, credential access, obfuscated code). If anything is unclear or risky, stop and ask the user what to do.'
+
+const RULE_HINTS = { 'pipe-to-shell': DOWNLOAD_HINT, 'pipe-to-iex': DOWNLOAD_HINT, 'iex-download': DOWNLOAD_HINT }
+
 const report = (hook, ids, target, verb = 'blocked') => {
   if (ids.length === 0) return 0
   ids.forEach((id) => logFinding(hook, id, target))
-  if (mode() !== 'enforce') return 0
-  process.stderr.write(`security-hook ${hook}: ${verb} by rule(s) ${ids.join(', ')} for ${target}. ${HINTS[hook] || 'Remove the value or move it to a secret store.'}\n`)
+  const blocking = ids.filter((id) => !warnOnly.has(id))
+  if (mode() !== 'enforce' || blocking.length === 0) return 0
+  process.stderr.write(`security-hook ${hook}: ${verb} by rule(s) ${blocking.join(', ')} for ${target}. ${blocking.map((id) => RULE_HINTS[id]).find(Boolean) || HINTS[hook] || 'Remove the value or move it to a secret store.'}\n`)
   return 2
 }
 

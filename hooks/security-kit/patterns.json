@@ -30,12 +30,14 @@
     },
     {
       "id": "connection-string-password",
+      "mode": "warn",
       "regex": "(?:Password|Pwd)\\s*=\\s*(?![{$%<*;\\s\"'])[^;\"'\\s]{4,}",
       "flags": "i",
       "shellRegex": "\\b(?:Password|Pwd)\\s*=\\s*(?![{$%<*;\\s\"'])[^;\"'\\s]{4,}"
     },
     {
       "id": "generic-secret-assignment",
+      "mode": "warn",
       "regex": "(?:api[_-]?key|secret|token|passwd|password)\\s*[:=]\\s*[\"'][A-Za-z0-9/+_=.-]{24,}[\"']",
       "flags": "i"
     }
@@ -62,12 +64,14 @@
     },
     {
       "id": "credential-store-read",
+      "mode": "warn",
       "regex": "\\b(?:cat|type|Get-Content|gc|more|less|head|tail|cp|copy|xcopy|scp|Copy-Item|Select-String|sls|grep|rg|findstr)\\b[^\\n|;&]*(?:\\.ssh[\\\\/]|id_rsa|id_ecdsa|id_ed25519|\\.aws[\\\\/]credentials|\\.azure[\\\\/]|\\.kube[\\\\/]config|\\.git-credentials|\\.netrc|\\.npmrc|\\.docker[\\\\/]config\\.json|\\.credentials\\.json|UserSecrets|\\.(?:pfx|p12|pem|key|snk|jks|keystore)\\b|(?:^|[\\s\\\\/\"'])\\.env(?!\\.(?:example|sample|template)\\b)(?:\\.[\\w-]+)?(?=[\\s\"']|$))",
       "flags": "i",
       "unless": "^\\s*(?:cp|copy|Copy-Item|xcopy)\\s+(?:-\\S+\\s+)*[^\\s|;&]*\\.env\\.(?:example|sample|template)\\s+[^\\s|;&]*\\.env\\s*$"
     },
     {
       "id": "tls-verification-off",
+      "mode": "warn",
       "regex": "\\bcurl\\b[^\\n]*\\s(?:-k|--insecure)\\b|-SkipCertificateCheck\\b"
     },
     {
@@ -79,6 +83,7 @@
   "configDrift": [
     {
       "id": "trusted-connection-with-credentials",
+      "mode": "warn",
       "files": ".*",
       "regex": "(?=[^\\n]*Trusted_Connection\\s*=\\s*(?:true|yes|sspi))(?=[^\\n]*(?:User\\s*Id|UID)\\s*=)[^\\n]*",
       "flags": "i"
